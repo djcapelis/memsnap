@@ -14,11 +14,11 @@
 
 int main()
 {
-    new_region_list(1779);
+    new_region_list(1779, 1);
     return 0;
 }
 
-struct region_list * new_region_list(pid_t pid)
+struct region_list * new_region_list(pid_t pid, int flags)
 {
     char * path = NULL;
     int maps_fd = -1;
@@ -54,23 +54,46 @@ struct region_list * new_region_list(pid_t pid)
     /* parse */
     while(1)
     {
-        cur->begin = (void *) strtol(maps + i, &tok, 16);
-        cur->end = (void * ) strtol(tok + 1, &tok, 16);
+        cur->next = calloc(sizeof(struct region_list), 1);
+        err_chk(cur->next == NULL);
+        cur->next->begin = (void *) strtol(maps + i, &tok, 16);
+        cur->next->end = (void *) strtol(tok + 1, &tok, 16);
         for(;maps[i] != '\n';i++);
+        if(flags & RL_FLAG_RWANON)
+        {
+            if(tok[1] != 'r' || tok[2] != 'w' || tok[21] != '0' || tok[22] != ' ')
+            {
+                free(cur->next);
+                cur->next = NULL;
+                i++;
+                if(i == maps_len)
+                    break;
+                else
+                    continue;
+            }
+        }
         if(i+1 == maps_len)
             break;
         else
             i++;
-        cur->next = calloc(sizeof(struct region_list), 1);
-        err_chk(cur->next == NULL);
+        cur = cur->next;
+    }
+
+    cur = head->next;
+    /* print regionlist */
+    while(cur != NULL)
+    {
+        printf("%p-%p\n", cur->begin, cur->end);
         cur = cur->next;
     }
 
     /* clean up */
+    cur = head->next;
+    free(head);
     free(path);
     free(maps);
     close(maps_fd);
-    return head;
+    return cur;
 
 err: /* Error handling */
     perror("new_region_list");
