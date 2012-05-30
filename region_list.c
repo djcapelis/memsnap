@@ -12,12 +12,6 @@
 
 #include "region_list.h"
 
-int main()
-{
-    new_region_list(1779, 1);
-    return 0;
-}
-
 struct region_list * new_region_list(pid_t pid, int flags)
 {
     char * path = NULL;
@@ -76,14 +70,6 @@ struct region_list * new_region_list(pid_t pid, int flags)
             break;
         else
             i++;
-        cur = cur->next;
-    }
-
-    cur = head->next;
-    /* print regionlist */
-    while(cur != NULL)
-    {
-        printf("%p-%p\n", cur->begin, cur->end);
         cur = cur->next;
     }
 
