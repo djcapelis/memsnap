@@ -39,14 +39,3 @@ struct region_list * free_region_list(struct region_list * rl)
     if(rl){};
     return NULL;
 }
-
-struct region_list * update_region_list(pid_t pid, struct region_list * rl)
-{
-    if(pid){};
-    return rl;
-}
-
-struct region_list * clean_region_list(struct region_list * rl)
-{
-    return rl;
-}
