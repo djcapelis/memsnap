@@ -29,7 +29,7 @@ struct itimerspec t;
 sem_t sem;
 
 // TODO: Parse command line options.  Meanwhile, hardcode:
-pid_t pid = 1779;
+pid_t pid = 1694;
 
 int main()
 {
@@ -39,56 +39,48 @@ int main()
     timer_create(CLOCK_MONOTONIC, NULL, &timer);
     t.it_value.tv_sec = 1;
     t.it_value.tv_nsec = 0;
-    t.it_interval.tv_sec = 1;
+    t.it_interval.tv_sec = 0;
     t.it_interval.tv_nsec = 0;
     timer_settime(timer, 0, &t, NULL);
 
-    sem_init(&sem, 0, 1);
-    printf("Init'd semaphore, waiting...\n");
+    sem_init(&sem, 0, 0);
+
+retry_sem:
     while(sem_wait(&sem) == 0)
     {
         int status;
-        int i;
-        char * path;
+        int i, j;
+        char * buffer;
         int mem_fd;
         int seg_fd;
         int seg_len;
-        char * memseg;
         off_t offset;
-        char hack = '\0';
 
-        path = calloc(1, 50);
-        snprintf(path, 24, "%s%d%s", "/proc/", (int) pid, "/mem");
+        buffer = calloc(1, 4096);
+        snprintf(buffer, 24, "%s%d%s", "/proc/", (int) pid, "/mem");
         
         ptrace(PTRACE_ATTACH, pid, NULL, NULL);
         wait(&status);
 
-        mem_fd = open(path, O_RDONLY);
+        mem_fd = open(buffer, O_RDONLY);
         rl = new_region_list(pid, RL_FLAG_RWANON);
         cur = rl;
         for(i=0; cur != NULL; i++)
         {
             seg_len = (int)((intptr_t) cur->end - (intptr_t) cur->begin);
-            snprintf(path, 48, "%s%d%s%d", "cycle_", cycle, "_seg_", i);
-            seg_fd = open(path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-
-            printf("%d\n", lseek(seg_fd, seg_len, SEEK_SET));
-            printf("%d\n", write(seg_fd, &hack, 1));
-            lseek(seg_fd, 0, SEEK_SET);
-            memseg = mmap(NULL, seg_len, PROT_READ | PROT_WRITE, MAP_SHARED, seg_fd, 0);
-
-            memseg[4] = '\0';
+            snprintf(buffer, 48, "%s%d%s%d", "cycle", cycle, "_seg", i);
+            seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
 
             offset = 0;
-            lseek(mem_fd, 0, (intptr_t) cur->begin);
-            while(offset != seg_len)
+            lseek(mem_fd, (intptr_t) cur->begin, SEEK_SET);
+            for(j=0; j<seg_len; j+=1024)
             {
-                printf("mem_fd: %d, memseg: %p, offset: %d, seg_len: %p, seg_fd: %d, cur->begin: %p, cur->end: %p\n", mem_fd, memseg, offset, seg_len, seg_fd, cur->begin, cur->end);
-                offset += read(mem_fd, memseg + offset, seg_len - offset);
-                perror("read:");
+                offset = read(mem_fd, buffer, 1024);
+                err_chk(offset == -1);
+                offset = write(seg_fd, buffer, 1024);
+                err_chk(offset == -1);
             }
 
-            munmap(memseg, seg_len);
             close(seg_fd);
 
             cur = cur->next;
@@ -96,20 +88,25 @@ int main()
         close(mem_fd);
     
         ptrace(PTRACE_DETACH, pid, NULL, NULL);
+        timer_settime(timer, 0, &t, NULL);
     
         printf("Cycle: %d\n", cycle);
         cycle++;
 
         free_region_list(rl);
     }
+    goto retry_sem; // Yes, yes, I know.
 
+    return 0;
+
+err:
+    perror("main");
+    ptrace(PTRACE_DETACH, pid, NULL, NULL);
     return 0;
 }
 
 void dumpmem(int __attribute__((unused)) useless)
 {
-    printf("In signal handler\n");
-
     signal(SIGALRM, &dumpmem);
 
     sem_post(&sem);
