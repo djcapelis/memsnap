@@ -17,7 +17,7 @@
 
 #include "region_list.h"
 
-void dumpmem(int useless);
+void alrm_hdlr(int useless);
 
 /* I love the smell of global variables at 5 in the morning. */
 struct region_list * rl;
@@ -33,8 +33,6 @@ pid_t pid = 1694;
 
 int main()
 {
-    dumpmem(0);
-
     /* Timer setup */
     timer_create(CLOCK_MONOTONIC, NULL, &timer);
     t.it_value.tv_sec = 1;
@@ -44,6 +42,9 @@ int main()
     timer_settime(timer, 0, &t, NULL);
 
     sem_init(&sem, 0, 0);
+
+    // Call the handler to set up the signal handling and post to the sem for the first time
+    alrm_hdlr(0);
 
 retry_sem:
     while(sem_wait(&sem) == 0)
@@ -105,9 +106,9 @@ err:
     return 0;
 }
 
-void dumpmem(int __attribute__((unused)) useless)
+void alrm_hdlr(int __attribute__((unused)) useless)
 {
-    signal(SIGALRM, &dumpmem);
+    signal(SIGALRM, &alrm_hdlr);
 
     sem_post(&sem);
     return;
