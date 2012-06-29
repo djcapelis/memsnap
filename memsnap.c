@@ -100,7 +100,6 @@ int main(int argc, char * argv[])
         print_usage();
         exit(-1);
     }
-    exit(0); // Option testing
 
     sem_init(&sem, 0, 0);
 
