@@ -2,9 +2,12 @@
 #include<signal.h>
 #include<unistd.h>
 #include<stdlib.h>
+#include<stdbool.h>
+#include<limits.h>
 #include<fcntl.h>
 #include<inttypes.h>
 #include<semaphore.h>
+#include<getopt.h>
 
 #include<sys/ptrace.h>
 #include<sys/types.h>
@@ -18,21 +21,89 @@
 #include "region_list.h"
 
 void alrm_hdlr(int useless);
+void print_usage();
+
+/* External data */
+extern char * optarg;
+extern int optind;      /* Index to first non-arg parameter */
 
 /* I love the smell of global variables at 5 in the morning. */
 struct region_list * rl;
 struct region_list * cur;
 
+/* More globals */
 int cycle = 0;
 timer_t timer;
 struct itimerspec t;
 sem_t sem;
 
-// TODO: Parse command line options.  Meanwhile, hardcode:
-pid_t pid = 1694;
+/* Options */
+bool OPT_H = false;
+bool OPT_T = false;
+bool OPT_M = false;
+bool OPT_P = false;
+bool OPT_S = false;
+bool OPT_U = false;
+bool OPT_D = false;
+bool OPT_C = false;
 
-int main()
+int termcyc;
+int interval;
+pid_t pid;
+
+void print_usage()
 {
+    fprintf(stderr, "Usage: memsnap -hsu -t <sec> -m <ms> -p <pid> -d <path>\n");
+    fprintf(stderr, "\t-h Print usage\n");
+    fprintf(stderr, "\t-p <pid> Attach to <pid>\n");
+    fprintf(stderr, "THE REMAINING OPTIONS ARE CURRENTLY UNIMPLEMENTED\n");
+}
+
+int main(int argc, char * argv[])
+{
+    /* Argument parsing */
+    char opt;
+    char * strerr = NULL;
+    long arg;
+    while((opt = getopt(argc, argv, "+ht:m:p:sud:c:")) != -1)
+    {
+        switch(opt)
+        {
+            case 'p':
+                if(OPT_P)
+                {
+                    fprintf(stderr, "memsnap can only attach one process at a time\n\n");
+                    print_usage();
+                    exit(-1);
+                }
+                OPT_P = true;
+                arg = strtol(optarg, &strerr, 10);
+                if(arg > INT_MAX || arg < 0 || strerr[0] != 0)
+                {
+                    fprintf(stderr, "Unable to parse pid correctly\n\n");
+                    print_usage();
+                    exit(-1);
+                }
+                pid = (pid_t) arg;
+                optarg = NULL;
+                break;
+            case 'h':
+            default:
+                print_usage();
+                return 0;
+        }
+    }
+    /* Option validity checks */
+    if(!OPT_P)
+    {
+        fprintf(stderr, "memsnap requires a pid\n\n");
+        print_usage();
+        exit(-1);
+    }
+    exit(0); // Option testing
+
+    sem_init(&sem, 0, 0);
+
     /* Timer setup */
     timer_create(CLOCK_MONOTONIC, NULL, &timer);
     t.it_value.tv_sec = 1;
@@ -40,8 +111,6 @@ int main()
     t.it_interval.tv_sec = 0;
     t.it_interval.tv_nsec = 0;
     timer_settime(timer, 0, &t, NULL);
-
-    sem_init(&sem, 0, 0);
 
     // Call the handler to set up the signal handling and post to the sem for the first time
     alrm_hdlr(0);
