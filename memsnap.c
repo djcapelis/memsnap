@@ -32,7 +32,7 @@ struct region_list * rl;
 struct region_list * cur;
 
 /* More globals */
-int cycle = 0;
+int snap = 0;
 timer_t timer;
 struct itimerspec t;
 sem_t sem;
@@ -45,18 +45,19 @@ bool OPT_P = false;
 bool OPT_S = false;
 bool OPT_U = false;
 bool OPT_D = false;
-bool OPT_C = false;
+bool OPT_F = false;
 
-int termcyc;
+int termsnap;
 int interval;
 pid_t pid;
 
 void print_usage()
 {
-    fprintf(stderr, "Usage: memsnap -hsu -t <sec> -m <ms> -p <pid> -d <path>\n");
+    fprintf(stderr, "Usage: memsnap -hsu -t <sec> -m <ms> -p <pid> -d <path> -f <snaps>\n");
     fprintf(stderr, "\t-h Print usage\n");
     fprintf(stderr, "\t-p <pid> Attach to <pid>\n");
     fprintf(stderr, "THE REMAINING OPTIONS ARE CURRENTLY UNIMPLEMENTED\n");
+    /* fprintf(stderr, "\t-f finish after <snaps> number of snapshots\n"); */
 }
 
 int main(int argc, char * argv[])
@@ -65,7 +66,7 @@ int main(int argc, char * argv[])
     char opt;
     char * strerr = NULL;
     long arg;
-    while((opt = getopt(argc, argv, "+ht:m:p:sud:c:")) != -1)
+    while((opt = getopt(argc, argv, "+ht:m:p:sud:f:")) != -1)
     {
         switch(opt)
         {
@@ -137,7 +138,7 @@ retry_sem:
         for(i=0; cur != NULL; i++)
         {
             seg_len = (int)((intptr_t) cur->end - (intptr_t) cur->begin);
-            snprintf(buffer, 48, "%s%d%s%d", "cycle", cycle, "_seg", i);
+            snprintf(buffer, 48, "%s%d%s%d", "snap", snap, "_seg", i);
             seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
 
             offset = 0;
@@ -159,8 +160,8 @@ retry_sem:
         ptrace(PTRACE_DETACH, pid, NULL, NULL);
         timer_settime(timer, 0, &t, NULL);
     
-        printf("Cycle: %d\n", cycle);
-        cycle++;
+        printf("Snap: %d\n", snap);
+        snap++;
 
         free_region_list(rl);
     }
