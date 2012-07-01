@@ -172,7 +172,7 @@ retry_sem:
 err:
     perror("main");
     ptrace(PTRACE_DETACH, pid, NULL, NULL);
-    return 0;
+    return -1;
 }
 
 void alrm_hdlr(int __attribute__((unused)) useless)
