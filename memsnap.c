@@ -56,12 +56,20 @@ void print_usage()
     fprintf(stderr, "Usage: memsnap -hsu -t <sec> -m <ms> -p <pid> -d <path> -f <snaps>\n");
     fprintf(stderr, "\t-h Print usage\n");
     fprintf(stderr, "\t-p <pid> Attach to <pid>\n");
+    fprintf(stderr, "\t-t <sec> Specify time interval between snapshots in seconds\n");
     fprintf(stderr, "THE REMAINING OPTIONS ARE CURRENTLY UNIMPLEMENTED\n");
     /* fprintf(stderr, "\t-f finish after <snaps> number of snapshots\n"); */
 }
 
 int main(int argc, char * argv[])
 {
+    /* Timer setup */
+    timer_create(CLOCK_MONOTONIC, NULL, &timer);
+    t.it_value.tv_sec = 1;
+    t.it_value.tv_nsec = 0;
+    t.it_interval.tv_sec = 0;
+    t.it_interval.tv_nsec = 0;
+
     /* Argument parsing */
     char opt;
     char * strerr = NULL;
@@ -81,11 +89,29 @@ int main(int argc, char * argv[])
                 arg = strtol(optarg, &strerr, 10);
                 if(arg > INT_MAX || arg < 0 || strerr[0] != 0)
                 {
-                    fprintf(stderr, "Unable to parse pid correctly\n\n");
+                    fprintf(stderr, "Unable to parse -p argument correctly, should be a pid\n\n");
                     print_usage();
                     exit(-1);
                 }
                 pid = (pid_t) arg;
+                optarg = NULL;
+                break;
+            case 't':
+                OPT_T = true;
+                if(OPT_M)
+                {
+                    fprintf(stderr, "-t and -m mutally exclusive\nPlease specify time in either seconds or miliseconds\n\n");
+                    print_usage();
+                    exit(-1);
+                }
+                arg = strtol(optarg, &strerr, 10);
+                if(arg > INT_MAX || arg < 0 || strerr[0] != 0)
+                {
+                    fprintf(stderr, "Unable to parse -t argument correctly, should be number of seconds\n\n");
+                    print_usage();
+                    exit(-1);
+                }
+                t.it_value.tv_sec = arg;
                 optarg = NULL;
                 break;
             case 'h':
@@ -101,19 +127,15 @@ int main(int argc, char * argv[])
         print_usage();
         exit(-1);
     }
+    //exit(0); // Option testing
 
     sem_init(&sem, 0, 0);
 
-    /* Timer setup */
-    timer_create(CLOCK_MONOTONIC, NULL, &timer);
-    t.it_value.tv_sec = 1;
-    t.it_value.tv_nsec = 0;
-    t.it_interval.tv_sec = 0;
-    t.it_interval.tv_nsec = 0;
-    timer_settime(timer, 0, &t, NULL);
-
     // Call the handler to set up the signal handling and post to the sem for the first time
     alrm_hdlr(0);
+
+    /* Timer set */
+    timer_settime(timer, 0, &t, NULL);
 
 retry_sem:
     while(sem_wait(&sem) == 0)
