@@ -57,6 +57,7 @@ void print_usage()
     fprintf(stderr, "\t-h Print usage\n");
     fprintf(stderr, "\t-p <pid> Attach to <pid>\n");
     fprintf(stderr, "\t-t <sec> Specify time interval between snapshots in seconds\n");
+    fprintf(stderr, "\t-m <ms> Specify time interval between snapshots in miliseconds\n");
     fprintf(stderr, "THE REMAINING OPTIONS ARE CURRENTLY UNIMPLEMENTED\n");
     /* fprintf(stderr, "\t-f finish after <snaps> number of snapshots\n"); */
 }
@@ -97,8 +98,12 @@ int main(int argc, char * argv[])
                 optarg = NULL;
                 break;
             case 't':
-                OPT_T = true;
-                if(OPT_M)
+            case 'm':
+                if(opt == 't')
+                    OPT_T = true;
+                else
+                    OPT_M = true;
+                if(OPT_M && OPT_T)
                 {
                     fprintf(stderr, "-t and -m mutally exclusive\nPlease specify time in either seconds or miliseconds\n\n");
                     print_usage();
@@ -107,11 +112,20 @@ int main(int argc, char * argv[])
                 arg = strtol(optarg, &strerr, 10);
                 if(arg > INT_MAX || arg < 0 || strerr[0] != 0)
                 {
-                    fprintf(stderr, "Unable to parse -t argument correctly, should be number of seconds\n\n");
+                    if(opt == 't')
+                        fprintf(stderr, "Unable to parse -t argument correctly, should be number of seconds\n\n");
+                    else
+                        fprintf(stderr, "Unable to parse -m argument correctly, should be number of seconds\n\n");
                     print_usage();
                     exit(-1);
                 }
-                t.it_value.tv_sec = arg;
+                if(opt == 'm')
+                {
+                    t.it_value.tv_nsec = (arg % 1000) * 1000000;
+                    t.it_value.tv_sec = (arg - (arg % 1000)) / 1000;
+                }
+                else
+                    t.it_value.tv_sec = arg;
                 optarg = NULL;
                 break;
             case 'h':
