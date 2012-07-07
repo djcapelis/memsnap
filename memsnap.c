@@ -122,7 +122,7 @@ int main(int argc, char * argv[])
                 if(opt == 'm')
                 {
                     t.it_value.tv_nsec = (arg % 1000) * 1000000;
-                    t.it_value.tv_sec = (arg - (arg % 1000)) / 1000;
+                    t.it_value.tv_sec = arg / 1000; /* truncates per Section 2.5 of K&R 2nd ed */
                 }
                 else
                     t.it_value.tv_sec = arg;
