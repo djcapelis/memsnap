@@ -57,7 +57,7 @@ void print_usage()
     fprintf(stderr, "\t-h Print usage\n");
     fprintf(stderr, "\t-p <pid> Attach to <pid>\n");
     fprintf(stderr, "\t-t <sec> Specify time interval between snapshots in seconds\n");
-    fprintf(stderr, "\t-m <ms> Specify time interval between snapshots in miliseconds\n");
+    fprintf(stderr, "\t-m <ms> Specify time interval between snapshots in milliseconds\n");
     fprintf(stderr, "THE REMAINING OPTIONS ARE CURRENTLY UNIMPLEMENTED\n");
     /* fprintf(stderr, "\t-f finish after <snaps> number of snapshots\n"); */
 }
@@ -105,7 +105,7 @@ int main(int argc, char * argv[])
                     OPT_M = true;
                 if(OPT_M && OPT_T)
                 {
-                    fprintf(stderr, "-t and -m mutally exclusive\nPlease specify time in either seconds or miliseconds\n\n");
+                    fprintf(stderr, "-t and -m mutally exclusive\nPlease specify time in either seconds or milliseconds\n\n");
                     print_usage();
                     exit(-1);
                 }
@@ -115,7 +115,7 @@ int main(int argc, char * argv[])
                     if(opt == 't')
                         fprintf(stderr, "Unable to parse -t argument correctly, should be number of seconds\n\n");
                     else
-                        fprintf(stderr, "Unable to parse -m argument correctly, should be number of seconds\n\n");
+                        fprintf(stderr, "Unable to parse -m argument correctly, should be number of milliseconds\n\n");
                     print_usage();
                     exit(-1);
                 }
