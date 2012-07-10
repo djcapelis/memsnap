@@ -32,7 +32,7 @@ struct region_list * rl;
 struct region_list * cur;
 
 /* More globals */
-int snap = 0;
+int snap = 1;
 timer_t timer;
 struct itimerspec t;
 sem_t sem;
@@ -58,6 +58,7 @@ void print_usage()
     fprintf(stderr, "\t-p <pid> Attach to <pid>\n");
     fprintf(stderr, "\t-t <sec> Specify time interval between snapshots in seconds\n");
     fprintf(stderr, "\t-m <ms> Specify time interval between snapshots in milliseconds\n");
+    fprintf(stderr, "\t-f <snaps> Finish after taking <snaps> number of snapshots\n");
     fprintf(stderr, "THE REMAINING OPTIONS ARE CURRENTLY UNIMPLEMENTED\n");
     /* fprintf(stderr, "\t-f finish after <snaps> number of snapshots\n"); */
 }
@@ -126,6 +127,30 @@ int main(int argc, char * argv[])
                 }
                 else
                     t.it_value.tv_sec = arg;
+                optarg = NULL;
+                break;
+            case 'f':
+                if(OPT_F)
+                {
+                    fprintf(stderr, "-f specified two or more times\n\n");
+                    print_usage();
+                    exit(-1);
+                }
+                OPT_F = true;
+                arg = strtol(optarg, &strerr, 10);
+                if(strerr[0] != 0)
+                {
+                    fprintf(stderr, "Unable to parse -f argument correctly, should be number of snapshots\n\n");
+                    print_usage();
+                    exit(-1);
+                }
+                if(arg < 0)
+                {
+                    fprintf(stderr, "Number of snapshots specified for -f argument is negative.\n\n");
+                    print_usage();
+                    exit(-1);
+                }
+                termsnap = arg;
                 optarg = NULL;
                 break;
             case 'h':
@@ -197,6 +222,11 @@ retry_sem:
         timer_settime(timer, 0, &t, NULL);
     
         printf("Snap: %d\n", snap);
+        if(OPT_F && snap == termsnap)
+        {
+            ptrace(PTRACE_DETACH, pid, NULL, NULL);
+            return 0;
+        }
         snap++;
 
         free_region_list(rl);
