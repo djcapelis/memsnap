@@ -20,8 +20,9 @@
 
 #include "region_list.h"
 
-void alrm_hdlr(int useless);
 void print_usage();
+void alrm_hdlr(int useless);
+void err_msg(char * msg);
 
 /* External data */
 extern char * optarg;
@@ -60,7 +61,6 @@ void print_usage()
     fprintf(stderr, "\t-m <ms> Specify time interval between snapshots in milliseconds\n");
     fprintf(stderr, "\t-f <snaps> Finish after taking <snaps> number of snapshots\n");
     fprintf(stderr, "THE REMAINING OPTIONS ARE CURRENTLY UNIMPLEMENTED\n");
-    /* fprintf(stderr, "\t-f finish after <snaps> number of snapshots\n"); */
 }
 
 int main(int argc, char * argv[])
@@ -82,19 +82,11 @@ int main(int argc, char * argv[])
         {
             case 'p':
                 if(OPT_P)
-                {
-                    fprintf(stderr, "memsnap can only attach one process at a time\n\n");
-                    print_usage();
-                    exit(-1);
-                }
+                    err_msg("memsnap can only attach one process at a time\n\n");
                 OPT_P = true;
                 arg = strtol(optarg, &strerr, 10);
                 if(arg > INT_MAX || arg < 0 || strerr[0] != 0)
-                {
-                    fprintf(stderr, "Unable to parse -p argument correctly, should be a pid\n\n");
-                    print_usage();
-                    exit(-1);
-                }
+                    err_msg("Unable to parse -p argument correctly, should be a pid\n\n");
                 pid = (pid_t) arg;
                 optarg = NULL;
                 break;
@@ -105,20 +97,14 @@ int main(int argc, char * argv[])
                 else
                     OPT_M = true;
                 if(OPT_M && OPT_T)
-                {
-                    fprintf(stderr, "-t and -m mutally exclusive\nPlease specify time in either seconds or milliseconds\n\n");
-                    print_usage();
-                    exit(-1);
-                }
+                    err_msg("-t and -m mutally exclusive\nPlease specify time in either seconds or milliseconds\n\n");
                 arg = strtol(optarg, &strerr, 10);
                 if(arg > INT_MAX || arg < 0 || strerr[0] != 0)
                 {
                     if(opt == 't')
-                        fprintf(stderr, "Unable to parse -t argument correctly, should be number of seconds\n\n");
+                        err_msg("Unable to parse -t argument correctly, should be number of seconds\n\n");
                     else
-                        fprintf(stderr, "Unable to parse -m argument correctly, should be number of milliseconds\n\n");
-                    print_usage();
-                    exit(-1);
+                        err_msg("Unable to parse -m argument correctly, should be number of milliseconds\n\n");
                 }
                 if(opt == 'm')
                 {
@@ -131,25 +117,13 @@ int main(int argc, char * argv[])
                 break;
             case 'f':
                 if(OPT_F)
-                {
-                    fprintf(stderr, "-f specified two or more times\n\n");
-                    print_usage();
-                    exit(-1);
-                }
+                    err_msg("-f specified two or more times\n\n");
                 OPT_F = true;
                 arg = strtol(optarg, &strerr, 10);
                 if(strerr[0] != 0)
-                {
-                    fprintf(stderr, "Unable to parse -f argument correctly, should be number of snapshots\n\n");
-                    print_usage();
-                    exit(-1);
-                }
+                    err_msg("Unable to parse -f argument correctly, should be number of snapshots\n\n");
                 if(arg < 0)
-                {
-                    fprintf(stderr, "Number of snapshots specified for -f argument is negative.\n\n");
-                    print_usage();
-                    exit(-1);
-                }
+                    err_msg("Number of snapshots specified for -f argument is negative.\n\n");
                 termsnap = arg;
                 optarg = NULL;
                 break;
@@ -161,11 +135,7 @@ int main(int argc, char * argv[])
     }
     /* Option validity checks */
     if(!OPT_P)
-    {
-        fprintf(stderr, "memsnap requires a pid\n\n");
-        print_usage();
-        exit(-1);
-    }
+        err_msg("memsnap requires a pid\n\n");
     //exit(0); // Option testing
 
     sem_init(&sem, 0, 0);
@@ -247,4 +217,11 @@ void alrm_hdlr(int __attribute__((unused)) useless)
 
     sem_post(&sem);
     return;
+}
+
+void err_msg(char * msg)
+{
+    fprintf(stderr, msg);
+    print_usage();
+    exit(-1);
 }
