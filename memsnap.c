@@ -20,6 +20,9 @@
 
 #include "region_list.h"
 
+/* memsnap defines */
+#define BUFFER_SIZE 4096  /* Must align with system page size */
+
 void print_usage();
 void alrm_hdlr(int useless);
 void err_msg(char * msg);
@@ -150,7 +153,7 @@ retry_sem:
     while(sem_wait(&sem) == 0)
     {
         int status;
-        int i, j;
+        int i, j, chk;
         char * buffer;
         int mem_fd;
         int seg_fd;
@@ -174,12 +177,24 @@ retry_sem:
 
             offset = 0;
             lseek(mem_fd, (intptr_t) cur->begin, SEEK_SET);
-            for(j=0; j<seg_len; j+=1024)
+            for(j=0; j<seg_len; j+=BUFFER_SIZE)
             {
-                offset = read(mem_fd, buffer, 1024);
+                offset = read(mem_fd, buffer, BUFFER_SIZE);
                 err_chk(offset == -1);
-                offset = write(seg_fd, buffer, 1024);
+                while(offset != BUFFER_SIZE)
+                {
+                    chk = read(mem_fd, buffer + offset, BUFFER_SIZE - offset);
+                    err_chk(chk == -1);
+                    offset += chk;
+                }
+                offset = write(seg_fd, buffer, BUFFER_SIZE);
                 err_chk(offset == -1);
+                while(offset != BUFFER_SIZE)
+                {
+                    chk = write(seg_fd, buffer + offset, BUFFER_SIZE - offset);
+                    err_chk(chk == -1);
+                    offset += chk;
+                }
             }
 
             close(seg_fd);
