@@ -58,14 +58,13 @@ pid_t pid;
 
 void print_usage()
 {
-    fprintf(stderr, "Usage: memsnap -hsu -t <sec> -m <ms> -p <pid> -d <path> -f <snaps>\n");
+    fprintf(stderr, "Usage: memsnap [options] -p pid\n");
     fprintf(stderr, "\t-h Print usage\n");
     fprintf(stderr, "\t-p <pid> Attach to <pid>\n");
     fprintf(stderr, "\t-t <sec> Specify time interval between snapshots in seconds\n");
     fprintf(stderr, "\t-m <ms> Specify time interval between snapshots in milliseconds\n");
     fprintf(stderr, "\t-u <us> Specify time interval between snapshots in microseconds\n");
     fprintf(stderr, "\t-f <snaps> Finish after taking <snaps> number of snapshots\n");
-    fprintf(stderr, "THE REMAINING OPTIONS ARE CURRENTLY UNIMPLEMENTED\n");
 }
 
 int main(int argc, char * argv[])
