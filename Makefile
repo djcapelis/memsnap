@@ -4,4 +4,4 @@ all:
 	gcc -Wall -Wextra -pedantic memsnap.o region_list.o -o memsnap -lrt -lpthread
 
 clean:
-	rm region_list
+	rm memsnap memsnap.o region_list.o
