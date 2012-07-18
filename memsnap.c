@@ -51,6 +51,7 @@ bool OPT_S = false;
 bool OPT_G = false;
 bool OPT_D = false;
 bool OPT_F = false;
+bool OPT_L = false;
 
 int termsnap;
 int interval;
@@ -65,6 +66,7 @@ void print_usage()
     fprintf(stderr, "\t-m <ms> Specify time interval between snapshots in milliseconds\n");
     fprintf(stderr, "\t-u <us> Specify time interval between snapshots in microseconds\n");
     fprintf(stderr, "\t-f <snaps> Finish after taking <snaps> number of snapshots\n");
+    fprintf(stderr, "\t-l Snap live, without pausing the process being snapshotted\n");
 }
 
 int main(int argc, char * argv[])
@@ -80,7 +82,7 @@ int main(int argc, char * argv[])
     char opt;
     char * strerr = NULL;
     long arg;
-    while((opt = getopt(argc, argv, "+ht:m:u:p:sgd:f:")) != -1)
+    while((opt = getopt(argc, argv, "+ht:m:u:p:sglad:f:")) != -1)
     {
         switch(opt)
         {
@@ -141,6 +143,9 @@ int main(int argc, char * argv[])
                 termsnap = arg;
                 optarg = NULL;
                 break;
+            case 'l':
+                OPT_L = true;
+                break;
             case 'h':
             default:
                 print_usage();
@@ -174,8 +179,11 @@ retry_sem:
         buffer = calloc(1, 4096);
         snprintf(buffer, 24, "%s%d%s", "/proc/", (int) pid, "/mem");
         
-        ptrace(PTRACE_ATTACH, pid, NULL, NULL);
-        wait(&status);
+        if(!OPT_L)
+        {
+            ptrace(PTRACE_ATTACH, pid, NULL, NULL);
+            wait(&status);
+        }
 
         mem_fd = open(buffer, O_RDONLY);
         rl = new_region_list(pid, RL_FLAG_RWANON);
@@ -214,13 +222,15 @@ retry_sem:
         }
         close(mem_fd);
     
-        ptrace(PTRACE_DETACH, pid, NULL, NULL);
+        if(!OPT_L)
+            ptrace(PTRACE_DETACH, pid, NULL, NULL);
         timer_settime(timer, 0, &t, NULL);
     
         printf("Snap: %d\n", snap);
         if(OPT_F && snap == termsnap)
         {
-            ptrace(PTRACE_DETACH, pid, NULL, NULL);
+            if(!OPT_L)
+                ptrace(PTRACE_DETACH, pid, NULL, NULL);
             return 0;
         }
         snap++;
@@ -233,7 +243,8 @@ retry_sem:
 
 err:
     perror("main");
-    ptrace(PTRACE_DETACH, pid, NULL, NULL);
+    if(!OPT_L)
+        ptrace(PTRACE_DETACH, pid, NULL, NULL);
     return -1;
 }
 
