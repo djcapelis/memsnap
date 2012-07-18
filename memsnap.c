@@ -102,7 +102,7 @@ int main(int argc, char * argv[])
                     err_msg("-t -m -u mutally exclusive\nPlease specify only one\n\n");
                 if(opt == 't')
                     OPT_T = true;
-                else if(opt == 'm');
+                else if(opt == 'm')
                     OPT_M = true;
                 else
                     OPT_U = true;
@@ -111,7 +111,7 @@ int main(int argc, char * argv[])
                 {
                     if(opt == 't')
                         err_msg("Unable to parse -t argument correctly, should be number of seconds\n\n");
-                    else if(opt == 'm');
+                    else if(opt == 'm')
                         err_msg("Unable to parse -m argument correctly, should be number of milliseconds\n\n");
                     else
                         err_msg("Unable to parse -u argument correctly, should be number of microseconds\n\n");
