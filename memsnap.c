@@ -45,9 +45,10 @@ sem_t sem;
 bool OPT_H = false;
 bool OPT_T = false;
 bool OPT_M = false;
+bool OPT_U = false;
 bool OPT_P = false;
 bool OPT_S = false;
-bool OPT_U = false;
+bool OPT_G = false;
 bool OPT_D = false;
 bool OPT_F = false;
 
@@ -62,6 +63,7 @@ void print_usage()
     fprintf(stderr, "\t-p <pid> Attach to <pid>\n");
     fprintf(stderr, "\t-t <sec> Specify time interval between snapshots in seconds\n");
     fprintf(stderr, "\t-m <ms> Specify time interval between snapshots in milliseconds\n");
+    fprintf(stderr, "\t-u <us> Specify time interval between snapshots in microseconds\n");
     fprintf(stderr, "\t-f <snaps> Finish after taking <snaps> number of snapshots\n");
     fprintf(stderr, "THE REMAINING OPTIONS ARE CURRENTLY UNIMPLEMENTED\n");
 }
@@ -79,7 +81,7 @@ int main(int argc, char * argv[])
     char opt;
     char * strerr = NULL;
     long arg;
-    while((opt = getopt(argc, argv, "+ht:m:p:sud:f:")) != -1)
+    while((opt = getopt(argc, argv, "+ht:m:u:p:sgd:f:")) != -1)
     {
         switch(opt)
         {
@@ -95,24 +97,34 @@ int main(int argc, char * argv[])
                 break;
             case 't':
             case 'm':
+            case 'u':
+                if(OPT_T || OPT_M || OPT_U)
+                    err_msg("-t -m -u mutally exclusive\nPlease specify only one\n\n");
                 if(opt == 't')
                     OPT_T = true;
-                else
+                else if(opt == 'm');
                     OPT_M = true;
-                if(OPT_M && OPT_T)
-                    err_msg("-t and -m mutally exclusive\nPlease specify time in either seconds or milliseconds\n\n");
+                else
+                    OPT_U = true;
                 arg = strtol(optarg, &strerr, 10);
                 if(arg > INT_MAX || arg < 0 || strerr[0] != 0)
                 {
                     if(opt == 't')
                         err_msg("Unable to parse -t argument correctly, should be number of seconds\n\n");
-                    else
+                    else if(opt == 'm');
                         err_msg("Unable to parse -m argument correctly, should be number of milliseconds\n\n");
+                    else
+                        err_msg("Unable to parse -u argument correctly, should be number of microseconds\n\n");
                 }
                 if(opt == 'm')
                 {
                     t.it_value.tv_nsec = (arg % 1000) * 1000000;
                     t.it_value.tv_sec = arg / 1000; /* truncates per Section 2.5 of K&R 2nd ed */
+                }
+                else if(opt == 'u')
+                {
+                    t.it_value.tv_nsec = (arg % 1000000) * 1000;
+                    t.it_value.tv_sec = arg / 1000000;
                 }
                 else
                     t.it_value.tv_sec = arg;
