@@ -2,4 +2,4 @@ memsnap.o
 region_list.o
 memsnap
 .*.swp
-snap*
+pid*_snap*

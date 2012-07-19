@@ -23,9 +23,18 @@
 /* memsnap defines */
 #define BUFFER_SIZE 4096  /* Must align with system page size */
 
+struct piditem
+{
+    pid_t pid;
+    struct piditem * next;
+};
+struct piditem * head;
+
 void print_usage();
 void alrm_hdlr(int useless);
 void err_msg(char * msg);
+void ptrace_all_pids(int cmd);
+void free_pid_list(struct piditem * ele);
 
 /* External data */
 extern char * optarg;
@@ -55,7 +64,6 @@ bool OPT_L = false;
 
 int termsnap;
 int interval;
-pid_t pid;
 
 void print_usage()
 {
@@ -71,6 +79,11 @@ void print_usage()
 
 int main(int argc, char * argv[])
 {
+    struct piditem * curitem;
+    /* piditem setup */
+    head = calloc(1, sizeof(struct piditem));
+    head->next = NULL;
+
     /* Timer setup */
     timer_create(CLOCK_MONOTONIC, NULL, &timer);
     t.it_value.tv_sec = 1;
@@ -87,13 +100,17 @@ int main(int argc, char * argv[])
         switch(opt)
         {
             case 'p':
-                if(OPT_P)
-                    err_msg("memsnap can only attach one process at a time\n\n");
                 OPT_P = true;
                 arg = strtol(optarg, &strerr, 10);
                 if(arg > INT_MAX || arg < 0 || strerr[0] != 0)
                     err_msg("Unable to parse -p argument correctly, should be a pid\n\n");
-                pid = (pid_t) arg;
+                curitem = head;
+                while(curitem->next != NULL)
+                    curitem = curitem->next; // Go to last list item
+                curitem->pid = (pid_t) arg;
+                curitem->next = calloc(1, sizeof(struct piditem));
+                curitem = curitem->next;
+                curitem->next = NULL;
                 optarg = NULL;
                 break;
             case 't':
@@ -168,83 +185,80 @@ int main(int argc, char * argv[])
 retry_sem:
     while(sem_wait(&sem) == 0)
     {
-        int status;
-        int i, j, chk;
-        char * buffer;
-        int mem_fd;
-        int seg_fd;
-        int seg_len;
-        off_t offset;
-
-        buffer = calloc(1, 4096);
-        snprintf(buffer, 24, "%s%d%s", "/proc/", (int) pid, "/mem");
-        
-        if(!OPT_L)
+        ptrace_all_pids(PTRACE_ATTACH);
+        curitem = head;
+        while(curitem->next != NULL)
         {
-            ptrace(PTRACE_ATTACH, pid, NULL, NULL);
-            wait(&status);
-        }
+            pid_t pid;
+            int i, j, chk;
+            char * buffer;
+            int mem_fd;
+            int seg_fd;
+            int seg_len;
+            off_t offset;
 
-        mem_fd = open(buffer, O_RDONLY);
-        rl = new_region_list(pid, RL_FLAG_RWANON);
-        cur = rl;
-        for(i=0; cur != NULL; i++)
-        {
-            seg_len = (int)((intptr_t) cur->end - (intptr_t) cur->begin);
-            snprintf(buffer, 48, "%s%d%s%d", "snap", snap, "_seg", i);
-            seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+            pid = curitem->pid;
 
-            offset = 0;
-            lseek(mem_fd, (intptr_t) cur->begin, SEEK_SET);
-            for(j=0; j<seg_len; j+=BUFFER_SIZE)
+            buffer = calloc(1, 4096);
+            snprintf(buffer, 24, "%s%d%s", "/proc/", (int) pid, "/mem");
+
+            mem_fd = open(buffer, O_RDONLY);
+            rl = new_region_list(pid, RL_FLAG_RWANON);
+            cur = rl;
+            for(i=0; cur != NULL; i++)
             {
-                offset = read(mem_fd, buffer, BUFFER_SIZE);
-                err_chk(offset == -1);
-                while(offset != BUFFER_SIZE)
+                seg_len = (int)((intptr_t) cur->end - (intptr_t) cur->begin);
+                snprintf(buffer, 4096, "%s%d%s%d%s%d", "pid", pid, "_snap", snap, "_seg", i);
+                seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+
+                offset = 0;
+                lseek(mem_fd, (intptr_t) cur->begin, SEEK_SET);
+                for(j=0; j<seg_len; j+=BUFFER_SIZE)
                 {
-                    chk = read(mem_fd, buffer + offset, BUFFER_SIZE - offset);
-                    err_chk(chk == -1);
-                    offset += chk;
+                    offset = read(mem_fd, buffer, BUFFER_SIZE);
+                    err_chk(offset == -1);
+                    while(offset != BUFFER_SIZE)
+                    {
+                        chk = read(mem_fd, buffer + offset, BUFFER_SIZE - offset);
+                        err_chk(chk == -1);
+                        offset += chk;
+                    }
+                    offset = write(seg_fd, buffer, BUFFER_SIZE);
+                    err_chk(offset == -1);
+                    while(offset != BUFFER_SIZE)
+                    {
+                        chk = write(seg_fd, buffer + offset, BUFFER_SIZE - offset);
+                        err_chk(chk == -1);
+                        offset += chk;
+                    }
                 }
-                offset = write(seg_fd, buffer, BUFFER_SIZE);
-                err_chk(offset == -1);
-                while(offset != BUFFER_SIZE)
-                {
-                    chk = write(seg_fd, buffer + offset, BUFFER_SIZE - offset);
-                    err_chk(chk == -1);
-                    offset += chk;
-                }
+
+                close(seg_fd);
+
+                cur = cur->next;
             }
-
-            close(seg_fd);
-
-            cur = cur->next;
+            close(mem_fd);
+            free_region_list(rl);
+            printf("snap: %d, pid: %d\n", snap, pid);
+            curitem = curitem->next;
         }
-        close(mem_fd);
-    
-        if(!OPT_L)
-            ptrace(PTRACE_DETACH, pid, NULL, NULL);
         timer_settime(timer, 0, &t, NULL);
-    
-        printf("Snap: %d\n", snap);
-        if(OPT_F && snap == termsnap)
-        {
-            if(!OPT_L)
-                ptrace(PTRACE_DETACH, pid, NULL, NULL);
-            return 0;
-        }
-        snap++;
 
-        free_region_list(rl);
+        ptrace_all_pids(PTRACE_DETACH);
+
+        if(OPT_F && snap == termsnap)
+            return 0;
+        snap++;
     }
     goto retry_sem; // Yes, yes, I know.
+
+    free_pid_list(head);
 
     return 0;
 
 err:
     perror("main");
-    if(!OPT_L)
-        ptrace(PTRACE_DETACH, pid, NULL, NULL);
+    ptrace_all_pids(PTRACE_DETACH);
     return -1;
 }
 
@@ -261,4 +275,28 @@ void err_msg(char * msg)
     fprintf(stderr, msg);
     print_usage();
     exit(-1);
+}
+
+void ptrace_all_pids(int cmd)
+{
+    int status;
+    if(OPT_L)
+        return;
+    struct piditem * cur = head;
+    while(cur->next != NULL)
+    {
+        ptrace(cmd, cur->pid, NULL, NULL);
+        if(cmd == PTRACE_ATTACH)
+            wait(&status);
+        cur = cur->next;
+    }
+}
+
+/* Frees all piditems subsequent in the list */
+void free_pid_list(struct piditem * ele)
+{
+    if(ele->next != NULL)
+        free_pid_list(ele->next);
+    free(ele->next);
+    ele->next = NULL;
 }
