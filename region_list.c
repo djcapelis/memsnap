@@ -59,6 +59,19 @@ struct region_list * new_region_list(pid_t pid, int flags)
                     continue;
             }
         }
+        else
+        {
+            if(tok[1] != 'r')
+            {
+                free(cur->next);
+                cur->next = NULL;
+                i++;
+                if(i == maps_len)
+                    break;
+                else
+                    continue;
+            }
+        }
         if(i+1 == maps_len)
             break;
         else

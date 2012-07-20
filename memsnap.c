@@ -61,6 +61,7 @@ bool OPT_G = false;
 bool OPT_D = false;
 bool OPT_F = false;
 bool OPT_L = false;
+bool OPT_A = false;
 
 int termsnap;
 int interval;
@@ -75,6 +76,7 @@ void print_usage()
     fprintf(stderr, "\t-u <us> Specify time interval between snapshots in microseconds\n");
     fprintf(stderr, "\t-f <snaps> Finish after taking <snaps> number of snapshots\n");
     fprintf(stderr, "\t-l Snap live, without pausing the process being snapshotted\n");
+    fprintf(stderr, "\t-a Snapshot all readable regions, including read-only segs & mapped files\n");
 }
 
 int main(int argc, char * argv[])
@@ -99,6 +101,9 @@ int main(int argc, char * argv[])
     {
         switch(opt)
         {
+            case 'a':
+                OPT_A = true;
+                break;
             case 'p':
                 OPT_P = true;
                 arg = strtol(optarg, &strerr, 10);
@@ -203,7 +208,10 @@ retry_sem:
             snprintf(buffer, 24, "%s%d%s", "/proc/", (int) pid, "/mem");
 
             mem_fd = open(buffer, O_RDONLY);
-            rl = new_region_list(pid, RL_FLAG_RWANON);
+            if(OPT_A)
+                rl = new_region_list(pid, 0);
+            else
+                rl = new_region_list(pid, RL_FLAG_RWANON);
             cur = rl;
             for(i=0; cur != NULL; i++)
             {
