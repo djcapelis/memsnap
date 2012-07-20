@@ -8,6 +8,7 @@
 #include<inttypes.h>
 #include<semaphore.h>
 #include<getopt.h>
+#include<errno.h>
 
 #include<sys/ptrace.h>
 #include<sys/types.h>
@@ -75,6 +76,8 @@ void print_usage()
     fprintf(stderr, "\t-m <ms> Specify time interval between snapshots in milliseconds\n");
     fprintf(stderr, "\t-u <us> Specify time interval between snapshots in microseconds\n");
     fprintf(stderr, "\t-f <snaps> Finish after taking <snaps> number of snapshots\n");
+    fprintf(stderr, "\t-g Snapshot all regions into one file globbed together\n");
+    /*fprintf(stderr, "\t-s Snapshot into a sparse file with regions at accurate offsets in file\n");*/ /* UNDOCUMENTED */
     fprintf(stderr, "\t-l Snap live, without pausing the process being snapshotted\n");
     fprintf(stderr, "\t-a Snapshot all readable regions, including read-only segs & mapped files\n");
 }
@@ -103,6 +106,12 @@ int main(int argc, char * argv[])
         {
             case 'a':
                 OPT_A = true;
+                break;
+            case 's':
+                OPT_S = true;
+                break;
+            case 'g':
+                OPT_G = true;
                 break;
             case 'p':
                 OPT_P = true;
@@ -175,6 +184,8 @@ int main(int argc, char * argv[])
         }
     }
     /* Option validity checks */
+    if(OPT_G && OPT_S)
+        err_msg("Options -g and -s are mutually exclusive\n\n");
     if(!OPT_P)
         err_msg("memsnap requires a pid\n\n");
     //exit(0); // Option testing
@@ -216,11 +227,25 @@ retry_sem:
             for(i=0; cur != NULL; i++)
             {
                 seg_len = (int)((intptr_t) cur->end - (intptr_t) cur->begin);
-                snprintf(buffer, 4096, "%s%d%s%d%s%d", "pid", pid, "_snap", snap, "_seg", i);
-                seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+                if(!OPT_S && !OPT_G) /* Normal execution, without -s or -g */
+                {
+                    snprintf(buffer, 4096, "%s%d%s%d%s%d", "pid", pid, "_snap", snap, "_seg", i);
+                    seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+                }
+                else if((OPT_S || OPT_G) && i == 0) /* Run on the first seg for -s or -g */
+                {
+                    snprintf(buffer, 4096, "%s%d%s%d", "pid", pid, "_snap", snap);
+                    seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+                }
 
                 offset = 0;
                 lseek(mem_fd, (intptr_t) cur->begin, SEEK_SET);
+                if(OPT_S)
+                {
+                    chk = lseek(seg_fd, (intptr_t) cur->begin, SEEK_SET);
+                    if(chk == -1 && errno == EINVAL)
+                        fprintf(stderr, "Seek failed in output sparse file, this is why -s is undocumented in memsnap.\n");
+                }
                 for(j=0; j<seg_len; j+=BUFFER_SIZE)
                 {
                     offset = read(mem_fd, buffer, BUFFER_SIZE);
@@ -241,7 +266,8 @@ retry_sem:
                     }
                 }
 
-                close(seg_fd);
+                if((!OPT_S && !OPT_G) || cur->next == NULL) /* If last seg, close even if -s or -g */
+                    close(seg_fd);
 
                 cur = cur->next;
             }

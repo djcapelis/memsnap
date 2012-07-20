@@ -7,4 +7,4 @@ clean:
 	rm memsnap memsnap.o region_list.o
 
 cleansnaps:
-	rm pid*_snap*_seg*
+	rm pid*_snap*
