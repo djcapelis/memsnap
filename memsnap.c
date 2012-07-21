@@ -1,3 +1,4 @@
+#define _GNU_SOURCE /* strnlen(), itimers*/
 #include<stdio.h>
 #include<signal.h>
 #include<unistd.h>
@@ -9,13 +10,13 @@
 #include<semaphore.h>
 #include<getopt.h>
 #include<errno.h>
+#include<string.h>
 
 #include<sys/ptrace.h>
 #include<sys/types.h>
 #include<sys/wait.h>
 #include<sys/mman.h>
 #include<sys/stat.h>
-#define __USE_POSIX199309
 #include<time.h>
 #include<sys/time.h>
 
@@ -50,6 +51,7 @@ int snap = 1;
 timer_t timer;
 struct itimerspec t;
 sem_t sem;
+bool is_attached;
 
 /* Options */
 bool OPT_H = false;
@@ -66,12 +68,15 @@ bool OPT_A = false;
 
 int termsnap;
 int interval;
+int destdirlen;
+char * destdir;
 
 void print_usage()
 {
     fprintf(stderr, "Usage: memsnap [options] -p pid\n");
     fprintf(stderr, "\t-h Print usage\n");
     fprintf(stderr, "\t-p <pid> Attach to <pid>\n");
+    fprintf(stderr, "\t-d <dir> Specify destination directory for snapshots\n");
     fprintf(stderr, "\t-t <sec> Specify time interval between snapshots in seconds\n");
     fprintf(stderr, "\t-m <ms> Specify time interval between snapshots in milliseconds\n");
     fprintf(stderr, "\t-u <us> Specify time interval between snapshots in microseconds\n");
@@ -84,6 +89,7 @@ void print_usage()
 
 int main(int argc, char * argv[])
 {
+    is_attached = false;
     struct piditem * curitem;
     /* piditem setup */
     head = calloc(1, sizeof(struct piditem));
@@ -100,6 +106,8 @@ int main(int argc, char * argv[])
     char opt;
     char * strerr = NULL;
     long arg;
+    struct stat dirstat;
+    int chk;
     while((opt = getopt(argc, argv, "+ht:m:u:p:sglad:f:")) != -1)
     {
         switch(opt)
@@ -112,6 +120,22 @@ int main(int argc, char * argv[])
                 break;
             case 'g':
                 OPT_G = true;
+                break;
+            case 'd':
+                if(OPT_D)
+                    err_msg("Two or more -d arguments, please specify only one destination path\n\n");
+                OPT_D = true;
+                destdir = optarg;
+                destdirlen = strnlen(optarg, 2049);
+                if(destdirlen > 2048)
+                    err_msg("Memsnap limits the destination directory (-d argument) to 2048 characters\n\n");
+                chk = stat(destdir, &dirstat);
+                if(chk == -1 && errno == ENOENT)
+                    err_msg("Invalid path specified by -d option\n\n");
+                else if(chk == -1)
+                    err_chk(1); /* Undefined error, handle using perror() */
+                if(!S_ISDIR(dirstat.st_mode))
+                    err_msg("Path specified by -d is not a directory\n\n");
                 break;
             case 'p':
                 OPT_P = true;
@@ -188,6 +212,13 @@ int main(int argc, char * argv[])
         err_msg("Options -g and -s are mutually exclusive\n\n");
     if(!OPT_P)
         err_msg("memsnap requires a pid\n\n");
+    if(!OPT_D)
+    {
+        destdirlen = 0;
+        destdir = calloc(1, 2);
+        destdir[0] = '.';
+        destdir[1] = '\0';
+    }
     //exit(0); // Option testing
 
     sem_init(&sem, 0, 0);
@@ -201,12 +232,13 @@ int main(int argc, char * argv[])
 retry_sem:
     while(sem_wait(&sem) == 0)
     {
+        is_attached = true;
         ptrace_all_pids(PTRACE_ATTACH);
         curitem = head;
         while(curitem->next != NULL)
         {
             pid_t pid;
-            int i, j, chk;
+            int i, j;
             char * buffer;
             int mem_fd;
             int seg_fd;
@@ -229,12 +261,12 @@ retry_sem:
                 seg_len = (int)((intptr_t) cur->end - (intptr_t) cur->begin);
                 if(!OPT_S && !OPT_G) /* Normal execution, without -s or -g */
                 {
-                    snprintf(buffer, 4096, "%s%d%s%d%s%d", "pid", pid, "_snap", snap, "_seg", i);
+                    snprintf(buffer, 4096 - destdirlen, "%s%s%d%s%d%s%d", destdir, "/pid", pid, "_snap", snap, "_seg", i);
                     seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
                 }
                 else if((OPT_S || OPT_G) && i == 0) /* Run on the first seg for -s or -g */
                 {
-                    snprintf(buffer, 4096, "%s%d%s%d", "pid", pid, "_snap", snap);
+                    snprintf(buffer, 4096 - destdirlen, "%s%s%d%s%d", destdir, "/pid", pid, "_snap", snap);
                     seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
                 }
 
@@ -279,6 +311,7 @@ retry_sem:
         timer_settime(timer, 0, &t, NULL);
 
         ptrace_all_pids(PTRACE_DETACH);
+        is_attached = false;
 
         if(OPT_F && snap == termsnap)
             return 0;
@@ -291,8 +324,9 @@ retry_sem:
     return 0;
 
 err:
-    perror("main");
-    ptrace_all_pids(PTRACE_DETACH);
+    perror("memsnap");
+    if(is_attached)
+        ptrace_all_pids(PTRACE_DETACH);
     return -1;
 }
 
