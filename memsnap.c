@@ -133,7 +133,10 @@ int main(int argc, char * argv[])
                 if(chk == -1 && errno == ENOENT)
                     err_msg("Invalid path specified by -d option\n\n");
                 else if(chk == -1)
-                    err_chk(1); /* Undefined error, handle using perror() */
+                {
+                    perror("Error parsing -d argument:"); /* Undefined error, handle using perror() */
+                    exit(-1);
+                }
                 if(!S_ISDIR(dirstat.st_mode))
                     err_msg("Path specified by -d is not a directory\n\n");
                 break;
