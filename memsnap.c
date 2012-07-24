@@ -66,11 +66,13 @@ bool OPT_F = false;
 bool OPT_L = false;
 bool OPT_A = false;
 
+/* Globals which totally work and are fine, shush. */
 int termsnap;
 int interval;
 int destdirlen;
 char * destdir;
 
+/* Does what it says on the tin */
 void print_usage()
 {
     fprintf(stderr, "Usage: memsnap [options] -p pid\n");
@@ -87,6 +89,7 @@ void print_usage()
     fprintf(stderr, "\t-a Snapshot all readable regions, including read-only segs & mapped files\n");
 }
 
+/* Entrypoint, argument parsing and core memory dumping functionality */
 int main(int argc, char * argv[])
 {
     is_attached = false;
@@ -216,14 +219,13 @@ int main(int argc, char * argv[])
         err_msg("Options -g and -s are mutually exclusive\n\n");
     if(!OPT_P)
         err_msg("memsnap requires a pid\n\n");
-    if(!OPT_D)
+    if(!OPT_D) /* Set default destdir to current directory if none is specified */
     {
         destdirlen = 0;
         destdir = calloc(1, 2);
         destdir[0] = '.';
         destdir[1] = '\0';
     }
-    //exit(0); // Option testing
 
     sem_init(&sem, 0, 0);
 
@@ -233,12 +235,15 @@ int main(int argc, char * argv[])
     /* Timer set */
     timer_settime(timer, 0, &t, NULL);
 
-retry_sem:
-    while(sem_wait(&sem) == 0)
+    /* Main memory dumping functionality and loop */
+    while(1)
     {
-        is_attached = true;
+        if(sem_wait(&sem) != 0) /* Signals cause returns, wait for a real sem_post() */
+            continue;
+        is_attached = true; /* From here on out, error handlers will PTRACE_DETACH */
         ptrace_all_pids(PTRACE_ATTACH);
         curitem = head;
+        /* Snapshot memory for each pid */
         while(curitem->next != NULL)
         {
             pid_t pid;
@@ -282,11 +287,13 @@ retry_sem:
                     if(chk == -1 && errno == EINVAL)
                         fprintf(stderr, "Seek failed in output sparse file, this is why -s is undocumented in memsnap.\n");
                 }
+                
+                /* read/write loop */
                 for(j=0; j<seg_len; j+=BUFFER_SIZE)
                 {
                     offset = read(mem_fd, buffer, BUFFER_SIZE);
                     err_chk(offset == -1);
-                    while(offset != BUFFER_SIZE)
+                    while(offset != BUFFER_SIZE) /* This usually shouldn't happen, but keep trying to read if need be */
                     {
                         chk = read(mem_fd, buffer + offset, BUFFER_SIZE - offset);
                         err_chk(chk == -1);
@@ -294,7 +301,7 @@ retry_sem:
                     }
                     offset = write(seg_fd, buffer, BUFFER_SIZE);
                     err_chk(offset == -1);
-                    while(offset != BUFFER_SIZE)
+                    while(offset != BUFFER_SIZE) /* This usually shouldn't happen, but keep trying to write if need be */
                     {
                         chk = write(seg_fd, buffer + offset, BUFFER_SIZE - offset);
                         err_chk(chk == -1);
@@ -312,28 +319,35 @@ retry_sem:
             printf("snap: %d, pid: %d\n", snap, pid);
             curitem = curitem->next;
         }
+        /* Reset timer */
         timer_settime(timer, 0, &t, NULL);
 
+        /* We're done, detach */
         ptrace_all_pids(PTRACE_DETACH);
         is_attached = false;
 
+        /* Check for termination */
         if(OPT_F && snap == termsnap)
+        {
+            free_pid_list(head);
             return 0;
+        }
         snap++;
     }
-    goto retry_sem; // Yes, yes, I know.
 
-    free_pid_list(head);
 
     return 0;
 
+/* Error handler called by the err_chk macro */
 err:
     perror("memsnap");
     if(is_attached)
         ptrace_all_pids(PTRACE_DETACH);
+    free_pid_list(head);
     return -1;
 }
 
+/* Signal handler that triggers on every timer fire */
 void alrm_hdlr(int __attribute__((unused)) useless)
 {
     signal(SIGALRM, &alrm_hdlr);
@@ -342,6 +356,7 @@ void alrm_hdlr(int __attribute__((unused)) useless)
     return;
 }
 
+/* Output an error message and bail */
 void err_msg(char * msg)
 {
     fprintf(stderr, msg);
@@ -349,6 +364,7 @@ void err_msg(char * msg)
     exit(-1);
 }
 
+/* Execute ptrace commands to the appropriate pids if the options are appropriate */
 void ptrace_all_pids(int cmd)
 {
     int status;
