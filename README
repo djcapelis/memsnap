@@ -10,9 +10,9 @@ Usage: memsnap [options] -p pid
         -m <ms> Specify time interval between snapshots in milliseconds
         -u <us> Specify time interval between snapshots in microseconds
         -f <snaps> Finish after taking <snaps> number of snapshots
-        -g Snapshot all regions into one file globbed together
+        -g Snapshot all segments into one file globbed together
         -l Snap live, without pausing the process being snapshot
-        -a Snapshot all readable regions, including read-only segs & mapped files
+        -a Snapshot all readable segments, including read-only segs & mapped files
 
 Limitations:
 * Linux only
