@@ -356,6 +356,7 @@ int main(int argc, char * argv[])
                 cur = cur->next;
             }
             close(mem_fd);
+            free(buffer);
             free_region_list(rl);
             printf("snap: %d, pid: %d\n", snap, pid);
             curitem = curitem->next;
@@ -370,6 +371,9 @@ int main(int argc, char * argv[])
         /* Check for termination */
         if(OPT_F && snap == termsnap)
         {
+            if(!OPT_D)
+                free(destdir);
+            timer_delete(timer);
             free_pid_list(head);
             return 0;
         }
@@ -384,6 +388,9 @@ err:
     perror("memsnap");
     if(is_attached)
         ptrace_all_pids(PTRACE_DETACH);
+    if(!OPT_D)
+        free(destdir);
+    timer_delete(timer);
     free_pid_list(head);
     return -1;
 }
@@ -437,6 +444,5 @@ void free_pid_list(struct piditem * ele)
 {
     if(ele->next != NULL)
         free_pid_list(ele->next);
-    free(ele->next);
-    ele->next = NULL;
+    free(ele);
 }
