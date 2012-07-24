@@ -58,7 +58,7 @@ bool is_attached;
 
 /* Options */
 bool OPT_H = false;
-bool OPT_T = false;
+bool OPT_s = false;
 bool OPT_M = false;
 bool OPT_U = false;
 bool OPT_P = false;
@@ -82,13 +82,13 @@ void print_usage()
     fprintf(stderr, "\t-h Print usage\n");
     fprintf(stderr, "\t-p <pid> Attach to <pid>\n");
     fprintf(stderr, "\t-d <dir> Specify destination directory for snapshots\n");
-    fprintf(stderr, "\t-t <sec> Specify time interval between snapshots in seconds\n");
+    fprintf(stderr, "\t-s <sec> Specify time interval between snapshots in seconds\n");
     fprintf(stderr, "\t-m <ms> Specify time interval between snapshots in milliseconds\n");
     fprintf(stderr, "\t-u <us> Specify time interval between snapshots in microseconds\n");
     fprintf(stderr, "\t-f <snaps> Finish after taking <snaps> number of snapshots\n");
     fprintf(stderr, "\t-g Snapshot all regions into one file globbed together\n");
-    /*fprintf(stderr, "\t-s Snapshot into a sparse file with regions at accurate offsets in file\n");*/ /* UNDOCUMENTED */
-    fprintf(stderr, "\t-l Snap live, without pausing the process being snapshotted\n");
+    /*fprintf(stderr, "\t-S Snapshot into a sparse file with regions at accurate offsets in file\n");*/ /* UNDOCUMENTED */
+    fprintf(stderr, "\t-l Snap live, without pausing the process(es) being snapshot\n");
     fprintf(stderr, "\t-a Snapshot all readable regions, including read-only segs & mapped files\n");
 }
 
@@ -116,14 +116,14 @@ int main(int argc, char * argv[])
     long arg;
     struct stat dirstat;
     int chk;
-    while((opt = getopt(argc, argv, "+ht:m:u:p:sglad:f:")) != -1)
+    while((opt = getopt(argc, argv, "+hs:m:u:p:Sglad:f:")) != -1)
     {
         switch(opt)
         {
             case 'a':
                 OPT_A = true;
                 break;
-            case 's':
+            case 'S':
                 OPT_S = true;
                 break;
             case 'g':
@@ -163,13 +163,13 @@ int main(int argc, char * argv[])
                 curitem->next = NULL;
                 optarg = NULL;
                 break;
-            case 't':
+            case 's':
             case 'm':
             case 'u':
-                if(OPT_T || OPT_M || OPT_U)
-                    err_msg("-t -m -u mutally exclusive\nPlease specify only one\n\n");
+                if(OPT_s || OPT_M || OPT_U)
+                    err_msg("-s -m -u mutally exclusive\nPlease specify only one\n\n");
                 if(opt == 't')
-                    OPT_T = true;
+                    OPT_s = true;
                 else if(opt == 'm')
                     OPT_M = true;
                 else
@@ -178,7 +178,7 @@ int main(int argc, char * argv[])
                 if(arg > INT_MAX || arg < 0 || strerr[0] != 0)
                 {
                     if(opt == 't')
-                        err_msg("Unable to parse -t argument correctly, should be number of seconds\n\n");
+                        err_msg("Unable to parse -s argument correctly, should be number of seconds\n\n");
                     else if(opt == 'm')
                         err_msg("Unable to parse -m argument correctly, should be number of milliseconds\n\n");
                     else
@@ -221,7 +221,7 @@ int main(int argc, char * argv[])
     }
     /* Option validity checks */
     if(OPT_G && OPT_S)
-        err_msg("Options -g and -s are mutually exclusive\n\n");
+        err_msg("Options -g and -S are mutually exclusive\n\n");
     if(!OPT_P)
         err_msg("memsnap requires a pid\n\n");
     if(!OPT_D) /* Set default destdir to current directory if none is specified */
@@ -309,12 +309,12 @@ int main(int argc, char * argv[])
             for(i=0; cur != NULL; i++)
             {
                 seg_len = (int)((intptr_t) cur->end - (intptr_t) cur->begin);
-                if(!OPT_S && !OPT_G) /* Normal execution, without -s or -g */
+                if(!OPT_S && !OPT_G) /* Normal execution, without -S or -g */
                 {
                     snprintf(buffer, 4096 - destdirlen, "%s%s%d%s%d%s%d", destdir, "/pid", pid, "_snap", snap, "_seg", i);
                     seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
                 }
-                else if((OPT_S || OPT_G) && i == 0) /* Run on the first seg for -s or -g */
+                else if((OPT_S || OPT_G) && i == 0) /* Run on the first seg for -S or -g */
                 {
                     snprintf(buffer, 4096 - destdirlen, "%s%s%d%s%d", destdir, "/pid", pid, "_snap", snap);
                     seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
@@ -326,7 +326,7 @@ int main(int argc, char * argv[])
                 {
                     chk = lseek(seg_fd, (intptr_t) cur->begin, SEEK_SET);
                     if(chk == -1 && errno == EINVAL)
-                        fprintf(stderr, "Seek failed in output sparse file, this is why -s is undocumented in memsnap.\n");
+                        fprintf(stderr, "Seek failed in output sparse file, this is why -S is undocumented in memsnap.\n");
                 }
                 
                 /* read/write loop */
@@ -350,7 +350,7 @@ int main(int argc, char * argv[])
                     }
                 }
 
-                if((!OPT_S && !OPT_G) || cur->next == NULL) /* If last seg, close even if -s or -g */
+                if((!OPT_S && !OPT_G) || cur->next == NULL) /* If last seg, close even if -S or -g */
                     close(seg_fd);
 
                 cur = cur->next;
