@@ -1,30 +1,32 @@
+/* Includes */
 #define _GNU_SOURCE /* strnlen(), itimers*/
 #include<stdio.h>
 #include<signal.h>
-#include<unistd.h>
 #include<stdlib.h>
+#include<unistd.h>
 #include<stdbool.h>
 #include<limits.h>
 #include<fcntl.h>
-#include<inttypes.h>
 #include<semaphore.h>
 #include<getopt.h>
 #include<errno.h>
 #include<string.h>
+#include<time.h>
 
+/* Includes from sys/ */
 #include<sys/ptrace.h>
 #include<sys/types.h>
 #include<sys/wait.h>
-#include<sys/mman.h>
 #include<sys/stat.h>
-#include<time.h>
-#include<sys/time.h>
 
+/* Local project includes */
 #include "region_list.h"
+#include "djc_defines.h"
 
 /* memsnap defines */
 #define BUFFER_SIZE 4096  /* Must align with system page size */
 
+/* piditem list, used to keep track of the pids memsnap is operating on */
 struct piditem
 {
     pid_t pid;
@@ -32,6 +34,7 @@ struct piditem
 };
 struct piditem * head;
 
+/* Functions */
 void print_usage();
 void alrm_hdlr(int useless);
 void err_msg(char * msg);
