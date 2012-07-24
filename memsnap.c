@@ -139,6 +139,7 @@ int main(int argc, char * argv[])
                 }
                 if(!S_ISDIR(dirstat.st_mode))
                     err_msg("Path specified by -d is not a directory\n\n");
+                optarg = NULL;
                 break;
             case 'p':
                 OPT_P = true;
