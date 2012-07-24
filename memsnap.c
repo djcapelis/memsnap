@@ -97,6 +97,8 @@ int main(int argc, char * argv[])
 {
     is_attached = false;
     struct piditem * curitem;
+    struct piditem * previtem;
+
     /* piditem setup */
     head = calloc(1, sizeof(struct piditem));
     head->next = NULL;
@@ -261,12 +263,48 @@ int main(int argc, char * argv[])
 
             buffer = calloc(1, 4096);
             snprintf(buffer, 24, "%s%d%s", "/proc/", (int) pid, "/mem");
-
             mem_fd = open(buffer, O_RDONLY);
+
             if(OPT_A)
                 rl = new_region_list(pid, 0);
             else
                 rl = new_region_list(pid, RL_FLAG_RWANON);
+            if(rl == NULL) /* Region list failed, process likely dead */
+            {
+                fprintf(stderr, "No longer snapshotting pid %d, unable to read maps\n", curitem->pid);
+
+                /* Fixup the pidlist */
+                if(head == curitem) /* current item is head of list */
+                {
+                    if(head->next->next == NULL) /* We are done */
+                    {
+                        fprintf(stderr, "No pids left to snapshot, terminating.\n");
+                        free_pid_list(head);
+                        return 0;
+                    }
+                    else
+                    {
+                        previtem = head;
+                        head = curitem->next;
+                        free(previtem);
+                        previtem = NULL;
+                        curitem = curitem->next;
+                        continue;
+                    }
+                }
+                else /* current item is not the head of the list */
+                {
+                    previtem = head;
+                    while(previtem->next != curitem) /* Find item previous to current item */
+                    {
+                        previtem = previtem->next;
+                    }
+                    previtem->next = curitem->next;
+                    free(curitem);
+                    curitem = previtem->next;
+                    continue;
+                }
+            }
             cur = rl;
             for(i=0; cur != NULL; i++)
             {
@@ -376,8 +414,19 @@ void ptrace_all_pids(int cmd)
     struct piditem * cur = head;
     while(cur->next != NULL)
     {
-        ptrace(cmd, cur->pid, NULL, NULL);
-        if(cmd == PTRACE_ATTACH)
+        status = ptrace(cmd, cur->pid, NULL, NULL);
+        if(status == -1 && errno != ESRCH)
+        {
+            char * perrormsg;
+            status = errno;
+            perrormsg = calloc(64, 1);
+            snprintf(perrormsg, 64, "tracing pid %d", cur->pid);
+            errno = status;
+            perror(perrormsg);
+            free(perrormsg);
+            exit(-1);
+        }
+        if(cmd == PTRACE_ATTACH && status != -1)
             wait(&status);
         cur = cur->next;
     }

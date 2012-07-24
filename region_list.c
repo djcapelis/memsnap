@@ -88,7 +88,7 @@ struct region_list * new_region_list(pid_t pid, int flags)
     return cur;
 
 err: /* Error handling */
-    perror("new_region_list");
+    /* perror("new_region_list"); */
     if(path)
         free(path);
     if(maps)
