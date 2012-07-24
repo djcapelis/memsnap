@@ -1,4 +1,4 @@
-Memsnap is a basic memory snapshotting tool that takes a process and dumps its memory into flatfiles at an interval you specify.  Memsnap is able to handle multiple -p arguments and can therefore snapshot multiple processes at once in a way where the snapshots are close to synced up.
+Memsnap is a basic memory snapshotting tool that takes a process and dumps its memory into flatfiles at an interval you specify.  Memsnap is able to handle multiple -p arguments and so can snapshot multiple processes at once, yielding memory snapshots from a group of processes which were all taken at similar times.
 
 Memsnap in its own words:
 $ memsnap -h
