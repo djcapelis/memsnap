@@ -1,7 +1,7 @@
 Memsnap is a basic memory snapshotting tool that takes a process and dumps its memory into flatfiles at an interval you specify.  Memsnap is able to handle multiple -p arguments and so can snapshot multiple processes at once, yielding memory snapshots from a group of processes which were all taken at similar times.  By default, only read/write segments of memory are captured, each segment numbered into its own flat file in the current directory, once per second.
 
 Memsnap in its own words:
-$ memsnap -h
+$ ./memsnap -h
 Usage: memsnap [options] -p pid
         -h Print usage
         -p <pid> Attach to <pid>
@@ -11,18 +11,22 @@ Usage: memsnap [options] -p pid
         -u <us> Specify time interval between snapshots in microseconds
         -f <snaps> Finish after taking <snaps> number of snapshots
         -g Snapshot all segments into one file globbed together
-        -l Snap live, without pausing the process being snapshot
-        -a Snapshot all readable segments, including read-only segs & mapped files
+        -c Produce corefiles by tickling each pid with gcore (EXPERIMENTAL)
+        -l Snap live, without pausing the process(es) being snapshot
+        -a Snapshot all readable segments, incl read-only segs & mapped files
 
 Limitations:
 * Linux only
 * Makes all kinds of horrible assumptions about the current format of /proc/<pid>/maps
 * Only readable segments are pulled out of memory, segments of program memory that lack a read bit are filtered by memsnap.
 * While memsnap will happily set a system timer into the microsecond range, the effective control over snapshots is not nearly that good.  Even offering this option is somewhat deceptive.
+* The -c flag is a hack that arguably should not be made available in such a bad state.
 
 Bugs:
 * Some race and timing conditions are present when processes die or are killed while being snapshotted and memsnap may not behave gracefully in all cases.  (It makes attempts at being graceful normally.)
 * Memsnap is not graceful when processes it is trying to snapshot and ptrace are ptrace'd by other trace utilities.
 
 Future:
-* Optionally (-c flag) produce snapshots in a coredump format for easy use with other tools
+* Write our own code for producing coredumps instead of just hacking in a gcore command.
+* Increased timer resolution
+* Care about performance?

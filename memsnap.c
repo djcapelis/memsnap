@@ -68,6 +68,7 @@ bool OPT_D = false;
 bool OPT_F = false;
 bool OPT_L = false;
 bool OPT_A = false;
+bool OPT_C = false;
 
 /* Globals which totally work and are fine, shush. */
 int termsnap;
@@ -87,9 +88,10 @@ void print_usage()
     fprintf(stderr, "\t-u <us> Specify time interval between snapshots in microseconds\n");
     fprintf(stderr, "\t-f <snaps> Finish after taking <snaps> number of snapshots\n");
     fprintf(stderr, "\t-g Snapshot all segments into one file globbed together\n");
+    fprintf(stderr, "\t-c Produce corefiles by tickling each pid with gcore (EXPERIMENTAL)\n");
     /*fprintf(stderr, "\t-S Snapshot into a sparse file with regions at accurate offsets in file\n");*/ /* UNDOCUMENTED */
     fprintf(stderr, "\t-l Snap live, without pausing the process(es) being snapshot\n");
-    fprintf(stderr, "\t-a Snapshot all readable segments, including read-only segs & mapped files\n");
+    fprintf(stderr, "\t-a Snapshot all readable segments, incl read-only segs & mapped files\n");
 }
 
 /* Entrypoint, argument parsing and core memory dumping functionality */
@@ -116,7 +118,7 @@ int main(int argc, char * argv[])
     long arg;
     struct stat dirstat;
     int chk;
-    while((opt = getopt(argc, argv, "+hs:m:u:p:Sglad:f:")) != -1)
+    while((opt = getopt(argc, argv, "+hs:m:u:p:Sglad:f:c")) != -1)
     {
         switch(opt)
         {
@@ -213,6 +215,13 @@ int main(int argc, char * argv[])
             case 'l':
                 OPT_L = true;
                 break;
+            case 'c':
+                OPT_C = true;
+                /* TODO: Suck less by doing your own ELF output */
+                if(WEXITSTATUS(system("gcore > /dev/null")) != 2)
+                    err_msg("Unable to execute gcore, which is required for the -c flag, ensure it is installed and in your path.\n\n");
+                fprintf(stderr, "Warning: The -c option to memsnap is marked as experimental.\nIt is available beacuse it is a useful feature, but the implementation is a poor hack which just calls gcore.\nYou must have this utility installed and in your path.\nYou must use the -l flag for live tracing and the regions captured by gcore are not the same as in the other memsnap output modes.\n\n");
+                break;
             case 'h':
             default:
                 print_usage();
@@ -224,9 +233,13 @@ int main(int argc, char * argv[])
         err_msg("Options -g and -S are mutually exclusive\n\n");
     if(!OPT_P)
         err_msg("memsnap requires a pid\n\n");
+    if(OPT_A && OPT_C)
+        fprintf(stderr, "Warning: -a is irrelevant when used with -c, gcore does its own stunts.\n\n");
+    if(OPT_C && !OPT_L)
+        err_msg("memsnap only supports -c with -l in this release.\n\n");
     if(!OPT_D) /* Set default destdir to current directory if none is specified */
     {
-        destdirlen = 0;
+        destdirlen = 2; /* extra room because it's, just shush */
         destdir = calloc(1, 2);
         destdir[0] = '.';
         destdir[1] = '\0';
@@ -306,54 +319,68 @@ int main(int argc, char * argv[])
                 }
             }
             cur = rl;
-            for(i=0; cur != NULL; i++)
+            if(OPT_C)
             {
-                seg_len = (int)((intptr_t) cur->end - (intptr_t) cur->begin);
-                if(!OPT_S && !OPT_G) /* Normal execution, without -S or -g */
+                char * hackbuffer;
+                hackbuffer = calloc(1, 4096);
+                snprintf(buffer, 4096 - destdirlen, "gcore -o %s%s%d%s%d %d > /dev/null", destdir, "/pid", pid, "_snap", snap, pid);
+                system(buffer);
+                snprintf(buffer, 4096 - destdirlen, "%s%s%d%s%d.%d", destdir, "/pid", pid, "_snap", snap, pid);
+                snprintf(hackbuffer, 4096 - destdirlen, "%s%s%d%s%d", destdir, "/pid", pid, "_snap", snap);
+                rename(buffer, hackbuffer);
+                free(hackbuffer);
+            }
+            else
+            {
+                for(i=0; cur != NULL; i++)
                 {
-                    snprintf(buffer, 4096 - destdirlen, "%s%s%d%s%d%s%d", destdir, "/pid", pid, "_snap", snap, "_seg", i);
-                    seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-                }
-                else if((OPT_S || OPT_G) && i == 0) /* Run on the first seg for -S or -g */
-                {
-                    snprintf(buffer, 4096 - destdirlen, "%s%s%d%s%d", destdir, "/pid", pid, "_snap", snap);
-                    seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-                }
-
-                offset = 0;
-                lseek(mem_fd, (intptr_t) cur->begin, SEEK_SET);
-                if(OPT_S)
-                {
-                    chk = lseek(seg_fd, (intptr_t) cur->begin, SEEK_SET);
-                    if(chk == -1 && errno == EINVAL)
-                        fprintf(stderr, "Seek failed in output sparse file, this is why -S is undocumented in memsnap.\n");
-                }
-                
-                /* read/write loop */
-                for(j=0; j<seg_len; j+=BUFFER_SIZE)
-                {
-                    offset = read(mem_fd, buffer, BUFFER_SIZE);
-                    err_chk(offset == -1);
-                    while(offset != BUFFER_SIZE) /* This usually shouldn't happen, but keep trying to read if need be */
+                    seg_len = (int)((intptr_t) cur->end - (intptr_t) cur->begin);
+                    if(!OPT_S && !OPT_G) /* Normal execution, without -S or -g */
                     {
-                        chk = read(mem_fd, buffer + offset, BUFFER_SIZE - offset);
-                        err_chk(chk == -1);
-                        offset += chk;
+                        snprintf(buffer, 4096 - destdirlen, "%s%s%d%s%d%s%d", destdir, "/pid", pid, "_snap", snap, "_seg", i);
+                        seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
                     }
-                    offset = write(seg_fd, buffer, BUFFER_SIZE);
-                    err_chk(offset == -1);
-                    while(offset != BUFFER_SIZE) /* This usually shouldn't happen, but keep trying to write if need be */
+                    else if((OPT_S || OPT_G) && i == 0) /* Run on the first seg for -S or -g */
                     {
-                        chk = write(seg_fd, buffer + offset, BUFFER_SIZE - offset);
-                        err_chk(chk == -1);
-                        offset += chk;
+                        snprintf(buffer, 4096 - destdirlen, "%s%s%d%s%d", destdir, "/pid", pid, "_snap", snap);
+                        seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
                     }
+
+                    offset = 0;
+                    lseek(mem_fd, (intptr_t) cur->begin, SEEK_SET);
+                    if(OPT_S)
+                    {
+                        chk = lseek(seg_fd, (intptr_t) cur->begin, SEEK_SET);
+                        if(chk == -1 && errno == EINVAL)
+                            fprintf(stderr, "Seek failed in output sparse file, this is why -S is undocumented in memsnap.\n");
+                    }
+
+                    /* read/write loop */
+                    for(j=0; j<seg_len; j+=BUFFER_SIZE)
+                    {
+                        offset = read(mem_fd, buffer, BUFFER_SIZE);
+                        err_chk(offset == -1);
+                        while(offset != BUFFER_SIZE) /* This usually shouldn't happen, but keep trying to read if need be */
+                        {
+                            chk = read(mem_fd, buffer + offset, BUFFER_SIZE - offset);
+                            err_chk(chk == -1);
+                            offset += chk;
+                        }
+                        offset = write(seg_fd, buffer, BUFFER_SIZE);
+                        err_chk(offset == -1);
+                        while(offset != BUFFER_SIZE) /* This usually shouldn't happen, but keep trying to write if need be */
+                        {
+                            chk = write(seg_fd, buffer + offset, BUFFER_SIZE - offset);
+                            err_chk(chk == -1);
+                            offset += chk;
+                        }
+                    }
+
+                    if((!OPT_S && !OPT_G) || cur->next == NULL) /* If last seg, close even if -S or -g */
+                        close(seg_fd);
+
+                    cur = cur->next;
                 }
-
-                if((!OPT_S && !OPT_G) || cur->next == NULL) /* If last seg, close even if -S or -g */
-                    close(seg_fd);
-
-                cur = cur->next;
             }
             close(mem_fd);
             free(buffer);
@@ -421,6 +448,16 @@ void ptrace_all_pids(int cmd)
     struct piditem * cur = head;
     while(cur->next != NULL)
     {
+        if(OPT_C) /* Not supported gracefully by gcore, so -c requires -l for now*/
+        {
+            if(cmd == PTRACE_ATTACH)
+                kill(cur->pid, SIGSTOP);
+            else if(cmd == PTRACE_DETACH)
+                kill(cur->pid, SIGCONT);
+            else
+                fprintf(stderr, "Unsupported ptrace command issued during -c flag, which uses signals instead of ptrace.\nPlease file a bug!\n");
+            continue;
+        }
         status = ptrace(cmd, cur->pid, NULL, NULL);
         if(status == -1 && errno != ESRCH)
         {
