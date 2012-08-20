@@ -265,9 +265,10 @@ int main(int argc, char * argv[])
         while(curitem->next != NULL)
         {
             pid_t pid;
-            int i, j;
+            int i, j, len;
             char * buffer;
             int mem_fd;
+            int memaddr_fd;
             int seg_fd;
             int seg_len;
             off_t offset;
@@ -332,6 +333,21 @@ int main(int argc, char * argv[])
             }
             else
             {
+                if(!OPT_G)
+                {
+                    snprintf(buffer, 4096 - destdirlen, "%s%s%d%s%d%s", destdir, "/pid", pid, "_snap", snap, "_addr");
+                    memaddr_fd = open(buffer, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+                    i = 0;
+                    while(cur != NULL)
+                    {
+                        len = snprintf(buffer, 4096, "seg %d: %p-%p\n", i, cur->begin, cur->end);
+                        write(memaddr_fd, buffer, len);
+                        i++;
+                        cur = cur->next;
+                    }
+                    close(memaddr_fd);
+                    cur=rl;
+                }
                 for(i=0; cur != NULL; i++)
                 {
                     seg_len = (int)((intptr_t) cur->end - (intptr_t) cur->begin);
