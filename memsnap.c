@@ -268,7 +268,7 @@ int main(int argc, char * argv[])
             int i, j, len;
             char * buffer;
             int mem_fd;
-            int memaddr_fd;
+            int regions_fd;
             int seg_fd;
             int seg_len;
             off_t offset;
@@ -335,17 +335,21 @@ int main(int argc, char * argv[])
             {
                 if(!OPT_G)
                 {
-                    snprintf(buffer, 4096, "%s%s%d%s%d%s", destdir, "/pid", pid, "_snap", snap, "_addr");
-                    memaddr_fd = open(buffer, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+                    snprintf(buffer, 4096, "%s%s%d%s%d%s", destdir, "/pid", pid, "_snap", snap, "_regions");
+                    regions_fd = open(buffer, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
                     i = 0;
                     while(cur != NULL)
                     {
                         len = snprintf(buffer, 4096, "seg %d: %p-%p\n", i, cur->begin, cur->end);
-                        write(memaddr_fd, buffer, len);
+                        offset = write(regions_fd, buffer, len);
+                        while(offset != len)
+                        {
+                            offset += write(regions_fd, buffer + offset, len - offset);
+                        }
                         i++;
                         cur = cur->next;
                     }
-                    close(memaddr_fd);
+                    close(regions_fd);
                     cur=rl;
                 }
                 for(i=0; cur != NULL; i++)
