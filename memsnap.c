@@ -324,10 +324,10 @@ int main(int argc, char * argv[])
             {
                 char * hackbuffer;
                 hackbuffer = calloc(1, 4096);
-                snprintf(buffer, 4096 - destdirlen, "gcore -o %s%s%d%s%d %d > /dev/null", destdir, "/pid", pid, "_snap", snap, pid);
+                snprintf(buffer, 4096, "gcore -o %s%s%d%s%d %d > /dev/null", destdir, "/pid", pid, "_snap", snap, pid);
                 system(buffer);
-                snprintf(buffer, 4096 - destdirlen, "%s%s%d%s%d.%d", destdir, "/pid", pid, "_snap", snap, pid);
-                snprintf(hackbuffer, 4096 - destdirlen, "%s%s%d%s%d", destdir, "/pid", pid, "_snap", snap);
+                snprintf(buffer, 4096, "%s%s%d%s%d.%d", destdir, "/pid", pid, "_snap", snap, pid);
+                snprintf(hackbuffer, 4096, "%s%s%d%s%d", destdir, "/pid", pid, "_snap", snap);
                 rename(buffer, hackbuffer);
                 free(hackbuffer);
             }
@@ -335,7 +335,7 @@ int main(int argc, char * argv[])
             {
                 if(!OPT_G)
                 {
-                    snprintf(buffer, 4096 - destdirlen, "%s%s%d%s%d%s", destdir, "/pid", pid, "_snap", snap, "_addr");
+                    snprintf(buffer, 4096, "%s%s%d%s%d%s", destdir, "/pid", pid, "_snap", snap, "_addr");
                     memaddr_fd = open(buffer, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
                     i = 0;
                     while(cur != NULL)
@@ -353,12 +353,12 @@ int main(int argc, char * argv[])
                     seg_len = (int)((intptr_t) cur->end - (intptr_t) cur->begin);
                     if(!OPT_S && !OPT_G) /* Normal execution, without -S or -g */
                     {
-                        snprintf(buffer, 4096 - destdirlen, "%s%s%d%s%d%s%d", destdir, "/pid", pid, "_snap", snap, "_seg", i);
+                        snprintf(buffer, 4096, "%s%s%d%s%d%s%d", destdir, "/pid", pid, "_snap", snap, "_seg", i);
                         seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
                     }
                     else if((OPT_S || OPT_G) && i == 0) /* Run on the first seg for -S or -g */
                     {
-                        snprintf(buffer, 4096 - destdirlen, "%s%s%d%s%d", destdir, "/pid", pid, "_snap", snap);
+                        snprintf(buffer, 4096, "%s%s%d%s%d", destdir, "/pid", pid, "_snap", snap);
                         seg_fd = open(buffer, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
                     }
 
