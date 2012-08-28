@@ -88,7 +88,7 @@ void print_usage()
     fprintf(stderr, "\t-u <us> Specify time interval between snapshots in microseconds\n");
     fprintf(stderr, "\t-f <snaps> Finish after taking <snaps> number of snapshots\n");
     fprintf(stderr, "\t-g Snapshot all segments into one file globbed together\n");
-    fprintf(stderr, "\t-c Produce corefiles by tickling each pid with gcore (EXPERIMENTAL)\n");
+    /*fprintf(stderr, "\t-c Produce corefiles by tickling each pid with gcore\n");*/ /* UNDOCUMENTED */
     /*fprintf(stderr, "\t-S Snapshot into a sparse file with regions at accurate offsets in file\n");*/ /* UNDOCUMENTED */
     fprintf(stderr, "\t-l Snap live, without pausing the process(es) being snapshot\n");
     fprintf(stderr, "\t-a Snapshot all readable segments, incl read-only segs & mapped files\n");
