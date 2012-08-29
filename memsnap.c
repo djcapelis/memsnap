@@ -226,6 +226,7 @@ int main(int argc, char * argv[])
                 break;
             case 'q':
                 OPT_Q = true;
+                break;
             case 'h':
             default:
                 print_usage();
