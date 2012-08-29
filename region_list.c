@@ -17,6 +17,7 @@ struct region_list * new_region_list(pid_t pid, int flags)
     struct region_list * head;
     struct region_list * cur;
     char * tok/*en_of_my_appreciation*/;
+    int chk;
 
     /* Initialize */
     path = calloc(1, 25);
@@ -31,12 +32,17 @@ struct region_list * new_region_list(pid_t pid, int flags)
     err_chk(maps_fd == -1);
 
     /* read maps into memory */
-    for(maps_len = 0; read(maps_fd, &i_hate_proc, 1) == 1; maps_len++); /* find length because files in proc are silly */
+    for(maps_len = 0; (chk = read(maps_fd, &i_hate_proc, 1)) == 1; maps_len++); /* find length because files in proc are silly */
+    err_chk(chk == -1);
     lseek(maps_fd, 0, SEEK_SET);
     maps = calloc(maps_len + 1, 1);
     err_chk(maps == NULL);
     while(offset != maps_len)
-        offset += read(maps_fd, maps + offset, maps_len - offset);
+    {
+        chk = read(maps_fd, maps + offset, maps_len - offset);
+        err_chk(chk == -1);
+        offset += chk;
+    }
 
     /* parse */
     while(1)

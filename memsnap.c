@@ -79,7 +79,7 @@ char * destdir;
 /* Does what it says on the tin */
 void print_usage()
 {
-    fprintf(stderr, "Usage: memsnap [options] -p pid\n");
+    fprintf(stderr, "Usage: memsnap [options] [command]\n");
     fprintf(stderr, "\t-h Print usage\n");
     fprintf(stderr, "\t-p <pid> Attach to <pid>\n");
     fprintf(stderr, "\t-d <dir> Specify destination directory for snapshots\n");
@@ -231,8 +231,6 @@ int main(int argc, char * argv[])
     /* Option validity checks */
     if(OPT_G && OPT_S)
         err_msg("Options -g and -S are mutually exclusive\n\n");
-    if(!OPT_P)
-        err_msg("memsnap requires a pid\n\n");
     if(OPT_A && OPT_C)
         fprintf(stderr, "Warning: -a is irrelevant when used with -c, gcore does its own stunts.\n\n");
     if(OPT_C && !OPT_L)
@@ -244,6 +242,43 @@ int main(int argc, char * argv[])
         destdir[0] = '.';
         destdir[1] = '\0';
     }
+
+    /* Start a process if specified on the command line */
+    if(argc > optind)
+    {
+        /* Fork */
+        pid_t ret = 0;
+        ret = fork();
+        err_chk(ret == -1);
+
+        /* Which side of the fork are we on? */
+        if(ret == 0) /* We are the child */
+        {
+            int i;
+            char ** arglist;
+            arglist = calloc((argc - optind) + 1, sizeof(char *)); /* Enough for all the args, plus a null */
+            for(i = optind;i <= argc;i++)
+                arglist[i - optind] = argv[i];
+            arglist[argc - optind] = NULL;
+            chk = execvp(argv[optind], arglist);  /* Never returns */
+            err_chk(chk == -1);
+        }
+        else /* We are the parent */
+        {
+            /* Insert new pid into pidlist */
+            curitem = head;
+            while(curitem->next != NULL)
+                curitem = curitem->next; // Go to last list item
+            curitem->pid = ret;
+            curitem->next = calloc(1, sizeof(struct piditem));
+            curitem = curitem->next;
+            curitem->next = NULL;
+        }
+    }
+
+    /* Check that there's something to snapshot */
+    if(head->pid == 0)
+        err_msg("No processes specified to snapshot\n\n");
 
     sem_init(&sem, 0, 0);
 
@@ -483,12 +518,11 @@ void ptrace_all_pids(int cmd)
         {
             char * perrormsg;
             status = errno;
-            perrormsg = calloc(64, 1);
-            snprintf(perrormsg, 64, "tracing pid %d", cur->pid);
+            perrormsg = calloc(128, 1);
+            snprintf(perrormsg, 128, "ptrace failed for pid %d", cur->pid);
             errno = status;
             perror(perrormsg);
             free(perrormsg);
-            exit(-1);
         }
         if(cmd == PTRACE_ATTACH && status != -1)
             wait(&status);

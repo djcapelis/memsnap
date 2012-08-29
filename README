@@ -2,7 +2,7 @@ Memsnap is a basic memory snapshotting tool that takes a process and dumps its m
 
 Memsnap in its own words:
 $ ./memsnap -h
-Usage: memsnap [options] -p pid
+Usage: memsnap [options] [command]
         -h Print usage
         -p <pid> Attach to <pid>
         -d <dir> Specify destination directory for snapshots
