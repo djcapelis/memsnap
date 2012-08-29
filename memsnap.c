@@ -69,6 +69,7 @@ bool OPT_F = false;
 bool OPT_L = false;
 bool OPT_A = false;
 bool OPT_C = false;
+bool OPT_Q = false;
 
 /* Globals which totally work and are fine, shush. */
 int termsnap;
@@ -92,6 +93,7 @@ void print_usage()
     /*fprintf(stderr, "\t-S Snapshot into a sparse file with regions at accurate offsets in file\n");*/ /* UNDOCUMENTED */
     fprintf(stderr, "\t-l Snap live, without pausing the process(es) being snapshot\n");
     fprintf(stderr, "\t-a Snapshot all readable segments, incl read-only segs & mapped files\n");
+    fprintf(stderr, "\t-q Be quiet, do not output anything but errors\n");
 }
 
 /* Entrypoint, argument parsing and core memory dumping functionality */
@@ -118,7 +120,7 @@ int main(int argc, char * argv[])
     long arg;
     struct stat dirstat;
     int chk;
-    while((opt = getopt(argc, argv, "+hs:m:u:p:Sglad:f:c")) != -1)
+    while((opt = getopt(argc, argv, "+hs:m:u:p:Sglad:f:cq")) != -1)
     {
         switch(opt)
         {
@@ -222,6 +224,8 @@ int main(int argc, char * argv[])
                     err_msg("Unable to execute gcore, which is required for the -c flag, ensure it is installed and in your path.\n\n");
                 fprintf(stderr, "Warning: The -c option to memsnap is marked as experimental.\nIt is available beacuse it is a useful feature, but the implementation is a poor hack which just calls gcore.\nYou must have this utility installed and in your path.\nYou must use the -l flag for live tracing and the regions captured by gcore are not the same as in the other memsnap output modes.\n\n");
                 break;
+            case 'q':
+                OPT_Q = true;
             case 'h':
             default:
                 print_usage();
@@ -320,14 +324,16 @@ int main(int argc, char * argv[])
                 rl = new_region_list(pid, RL_FLAG_RWANON);
             if(rl == NULL) /* Region list failed, process likely dead */
             {
-                fprintf(stderr, "No longer snapshotting pid %d, unable to read maps\n", curitem->pid);
+                if(!OPT_Q)
+                    fprintf(stderr, "No longer snapshotting pid %d, unable to read maps\n", curitem->pid);
 
                 /* Fixup the pidlist */
                 if(head == curitem) /* current item is head of list */
                 {
                     if(head->next->next == NULL) /* We are done */
                     {
-                        fprintf(stderr, "No pids left to snapshot, terminating.\n");
+                        if(!OPT_Q)
+                            fprintf(stderr, "No pids left to snapshot, terminating.\n");
                         free_pid_list(head);
                         return 0;
                     }
@@ -440,7 +446,8 @@ int main(int argc, char * argv[])
             close(mem_fd);
             free(buffer);
             free_region_list(rl);
-            printf("snap: %d, pid: %d\n", snap, pid);
+            if(!OPT_Q)
+                printf("snap: %d, pid: %d\n", snap, pid);
             curitem = curitem->next;
         }
         /* Reset timer */
@@ -521,7 +528,8 @@ void ptrace_all_pids(int cmd)
             perrormsg = calloc(128, 1);
             snprintf(perrormsg, 128, "ptrace failed for pid %d", cur->pid);
             errno = status;
-            perror(perrormsg);
+            if(!OPT_Q)
+                perror(perrormsg);
             free(perrormsg);
         }
         if(cmd == PTRACE_ATTACH && status != -1)

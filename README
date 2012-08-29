@@ -13,6 +13,7 @@ Usage: memsnap [options] [command]
         -g Snapshot all segments into one file globbed together
         -l Snap live, without pausing the process(es) being snapshot
         -a Snapshot all readable segments, incl read-only segs & mapped files
+        -q Be quiet, do not output anything but errors
 
 Limitations:
 * Linux only
