@@ -172,7 +172,7 @@ int main(int argc, char * argv[])
             case 'u':
                 if(OPT_s || OPT_M || OPT_U)
                     err_msg("-s -m -u mutally exclusive\nPlease specify only one\n\n");
-                if(opt == 't')
+                if(opt == 's')
                     OPT_s = true;
                 else if(opt == 'm')
                     OPT_M = true;
@@ -181,7 +181,7 @@ int main(int argc, char * argv[])
                 arg = strtol(optarg, &strerr, 10);
                 if(arg > INT_MAX || arg < 0 || strerr[0] != 0)
                 {
-                    if(opt == 't')
+                    if(opt == 's')
                         err_msg("Unable to parse -s argument correctly, should be number of seconds\n\n");
                     else if(opt == 'm')
                         err_msg("Unable to parse -m argument correctly, should be number of milliseconds\n\n");
