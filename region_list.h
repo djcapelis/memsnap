@@ -1,3 +1,10 @@
+/***********************************************************************
+ * region_list.h                                                       *
+ *                                                                     *
+ * Everything you'd want in a header file for a region_list structure  *
+ *                                                                     *
+ **********************************************************************/
+
 #include <sys/types.h>
 #include <unistd.h>
 

@@ -1,3 +1,11 @@
+/***********************************************************************
+ * region_list.c                                                       *
+ *                                                                     *
+ * Implementation of the region_list structure                         *
+ *                                                                     *
+ **********************************************************************/
+
+/* Includes */
 #include<errno.h>
 #include<stdlib.h>
 #include<stdio.h>
@@ -5,8 +13,19 @@
 
 #include "region_list.h"
 
+/***********************************************************************
+* new_region_list - initialize a new region_list                       *
+*                                                                      *
+* Given a pid, new_region_list crawls through /proc/<pid>/maps and     *
+* produces a linked list called region_list which contains the         *
+* addresses for all the memory regions in the pid's address space.     *
+*                                                                      *
+* The flag RL_FLAG_ANON specifies whether it should include all the    *
+* segments it can read in this list or just the interesting ones.      *
+***********************************************************************/
 struct region_list * new_region_list(pid_t pid, int flags)
 {
+    /* Variables */
     char * path = NULL;
     int maps_fd = -1;
     int maps_len;
@@ -104,6 +123,7 @@ err: /* Error handling */
     return NULL;
 }
 
+/* Free a region_list */
 struct region_list * free_region_list(struct region_list * rl)
 {
     if(rl->next != NULL)
