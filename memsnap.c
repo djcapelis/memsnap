@@ -429,8 +429,7 @@ int main(int argc, char * argv[])
                 len = snprintf(buffer, 4096, "seg %d: %p-%p\n", i, cur->begin, cur->end);
                 err_chk(len < 1);
 
-                offset = write(regions_fd, buffer, len);
-                err_chk(offset == -1);
+                offset = 0;
                 while(offset != len)
                 {
                     chk = write(regions_fd, buffer + offset, len - offset);
@@ -472,23 +471,20 @@ int main(int argc, char * argv[])
                         fprintf(stderr, "Seek failed in output sparse file, this is why -S is undocumented in memsnap.\n");
                 }
 
-                offset = 0;
                 seg_len = (int)((intptr_t) cur->end - (intptr_t) cur->begin);
 
                 /* read/write loop */
                 for(j=0; j<seg_len; j+=BUFFER_SIZE)
                 {
-                    offset = read(mem_fd, buffer, BUFFER_SIZE);
-                    err_chk(offset == -1);
-                    while(offset != BUFFER_SIZE) /* This usually shouldn't happen, but keep trying to read if need be */
+                    offset = 0;
+                    while(offset != BUFFER_SIZE)
                     {
                         chk = read(mem_fd, buffer + offset, BUFFER_SIZE - offset);
                         err_chk(chk == -1);
                         offset += chk;
                     }
-                    offset = write(seg_fd, buffer, BUFFER_SIZE);
-                    err_chk(offset == -1);
-                    while(offset != BUFFER_SIZE) /* This usually shouldn't happen, but keep trying to write if need be */
+                    offset = 0;
+                    while(offset != BUFFER_SIZE)
                     {
                         chk = write(seg_fd, buffer + offset, BUFFER_SIZE - offset);
                         err_chk(chk == -1);
