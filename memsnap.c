@@ -433,7 +433,7 @@ int main(int argc, char * argv[])
                 while(offset != len)
                 {
                     chk = write(regions_fd, buffer + offset, len - offset);
-                    err_chk(chk != -1);
+                    err_chk(chk == -1);
                     offset += chk;
                 }
 
