@@ -52,7 +52,7 @@ struct region_list * new_region_list(pid_t pid, int flags)
 
     /* read maps into memory */
     for(maps_len = 0; (chk = read(maps_fd, &i_hate_proc, 1)) == 1; maps_len++); /* find length because files in proc are silly */
-    err_chk(chk == -1);
+    err_chk(chk == -1 || maps_len == 0);
     lseek(maps_fd, 0, SEEK_SET);
     maps = calloc(maps_len + 1, 1);
     err_chk(maps == NULL);
