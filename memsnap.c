@@ -633,8 +633,8 @@ void ptrace_all_pids(int cmd)
         {
             char * perrormsg;
             status = errno; /* Stash errno in a temporary variable while we call other functions */
-            snprintf(perrormsg, 128, "ptrace failed for pid %d", cur->pid);
             perrormsg = calloc(128, 1); /* 128 bytes is enough for anyone... */
+            snprintf(perrormsg, 128, "ptrace failed for pid %d", cur->pid);
             errno = status; /* Bring back saved errno */
             status = -1;
             if(!OPT_Q)
